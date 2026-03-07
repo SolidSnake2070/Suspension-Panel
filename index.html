@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MX Suspension Tool</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar card">
+      <div>
+        <div class="eyebrow">Garage Panel</div>
+        <h1>MX Suspension Tool</h1>
+        <p class="subtle">GitHub-Pages-Version ohne React, direkt im Browser testbar.</p>
+      </div>
+      <div class="active-bike-chip" id="activeBikeChip">Kein Motorrad</div>
+    </header>
+
+    <section class="card">
+      <div class="section-title-row">
+        <div>
+          <div class="eyebrow">Fahrzeug-Dashboard</div>
+          <h2>Bike auswählen</h2>
+        </div>
+      </div>
+      <div id="bikeDashboard" class="bike-dashboard"></div>
+      <div class="inline-row add-bike-row">
+        <input id="newBikeInput" class="text-input" type="text" placeholder="z. B. KX250F 2009" />
+        <button id="addBikeBtn" class="btn primary">Bike hinzufügen</button>
+      </div>
+    </section>
+
+    <main class="main-grid">
+      <section class="left-column" id="editorWrap">
+        <div class="card card-animated">
+          <div class="section-title-row">
+            <div>
+              <div class="eyebrow">Setup</div>
+              <h2 id="editorTitle">Basisdaten</h2>
+            </div>
+            <button id="deleteBikeBtn" class="btn danger">Bike löschen</button>
+          </div>
+
+          <div class="info-box">
+            <div>Aktiv: <strong id="currentBikeLabel">-</strong></div>
+            <div class="subtle small">Jedes Bike hat seinen eigenen Entwurf und seine eigenen gespeicherten Setups.</div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field full" id="customBikeField" hidden>
+              <label for="bikeCustom">Motorrad frei eingeben</label>
+              <input id="bikeCustom" class="text-input" type="text" placeholder="z. B. KX250F 2009" />
+            </div>
+            <div class="field">
+              <label for="track">Strecke</label>
+              <input id="track" class="text-input" type="text" placeholder="z. B. Tensfeld" />
+            </div>
+            <div class="field">
+              <label for="surface">Boden-Notiz</label>
+              <select id="surface" class="text-input">
+                <option value="sand">Sand</option>
+                <option value="hardpack">Hartboden</option>
+                <option value="mixed">Mischboden</option>
+                <option value="loam">Lehm</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="weather">Wetter-Notiz</label>
+              <select id="weather" class="text-input">
+                <option value="dry">Trocken</option>
+                <option value="damp">Feucht</option>
+                <option value="wet">Nass</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card-animated"><div class="section-title-row"><h2>Gabel</h2></div><div id="forkCompressionWrap"></div><div id="forkReboundWrap"></div></div>
+
+        <div class="card card-animated">
+          <div class="section-title-row"><h2>Federbein</h2></div>
+          <div class="field">
+            <label for="shockHigh">Highspeed Compression</label>
+            <select id="shockHigh" class="text-input small-select">
+              <option value="n.v.">n.v.</option><option value="0.5">0.5</option><option value="1.0">1.0</option><option value="1.5">1.5</option><option value="2.0">2.0</option><option value="2.5">2.5</option><option value="3.0">3.0</option>
+            </select>
+            <div class="subtle small">Höher = tendenziell mehr Stabilität und Hold-up.</div>
+          </div>
+          <div id="shockLowWrap"></div>
+          <div id="shockReboundWrap"></div>
+          <div class="field">
+            <label for="sag">Sag</label>
+            <div class="inline-row"><input id="sag" class="text-input number-input" type="number" min="80" max="130" /><span class="small subtle">mm</span></div>
+          </div>
+        </div>
+
+        <div class="card card-animated"><div class="section-title-row"><h2>Notizen</h2></div><textarea id="notes" class="textarea-input" placeholder="z. B. ruhig im Anbremsen, leicht unruhig in schnellen Wellen"></textarea></div>
+        <div class="action-row"><button id="saveSetupBtn" class="btn primary">Setup speichern</button><button id="resetFormBtn" class="btn">Formular zurücksetzen</button></div>
+      </section>
+
+      <aside class="right-column">
+        <section class="card">
+          <div class="section-title-row"><h2>Berechneter Einsatzbereich</h2></div>
+          <div class="terrain-map" id="terrainMap">
+            <div class="axis-label top">Nass</div><div class="axis-label bottom">Trocken</div><div class="axis-label left">Hartboden</div><div class="axis-label right">Sand</div>
+            <div class="axis-v"></div><div class="axis-h"></div><div class="terrain-point" id="terrainPoint"></div>
+          </div>
+          <div class="badge-row"><span class="chip" id="surfaceChip">-</span><span class="chip secondary" id="weatherChip">-</span><span class="chip secondary" id="confidenceChip">Treffer 0%</span></div>
+        </section>
+        <section class="card">
+          <div class="section-title-row"><h2>Analyse</h2></div>
+          <div class="stats-grid">
+            <div class="stat-box"><span>Zielboden</span><strong id="analysisSurface">-</strong></div>
+            <div class="stat-box"><span>Zielzustand</span><strong id="analysisWeather">-</strong></div>
+            <div class="stat-box"><span>Firmness</span><strong id="analysisFirmness">-</strong></div>
+            <div class="stat-box"><span>Hold-up</span><strong id="analysisHoldUp">-</strong></div>
+            <div class="stat-box"><span>Front-Bias</span><strong id="analysisFront">-</strong></div>
+            <div class="stat-box"><span>Rear-Bias</span><strong id="analysisRear">-</strong></div>
+          </div>
+          <div class="reason-list" id="reasonList"></div>
+        </section>
+        <section class="card"><div class="section-title-row"><h2>Streckenübersicht</h2></div><div class="track-filter-row" id="trackFilterRow"></div><div class="track-list" id="trackList"></div></section>
+        <section class="card"><div class="section-title-row"><h2>Tipps nach Symptom</h2></div><div class="field"><label for="selectedSymptom">Symptom auswählen</label><select id="selectedSymptom" class="text-input"></select></div><div class="tip-list" id="tipList"></div></section>
+        <section class="card"><div class="section-title-row"><h2>Gespeicherte Setups</h2></div><div id="setupList" class="setup-list"></div></section>
+      </aside>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
