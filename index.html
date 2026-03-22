@@ -3,36 +3,63 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MX Suspension Tool</title>
+  <title>MX Tool – Suspension</title>
+
+  <meta name="theme-color" content="#0b1220" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
+
 <body>
   <div class="app-shell">
+
+    <!-- 🔷 TOPBAR -->
     <header class="topbar">
+
+      <!-- Titelbereich -->
       <div>
         <p class="eyebrow">MX Setup Manager</p>
         <h1>Suspension Tool</h1>
       </div>
 
+      <!-- Rechte Seite -->
       <div class="topbar-actions">
-        <div class="topbar-actions">
-  <div class="tool-nav">
-    <span class="tool-nav-label">Tools</span>
-    <a href="https://solidsnake2070.github.io/Garage-Tool/" class="tool-nav-link">
-      Garage Tool
-    </a>
-  </div>
-          
-        <button id="exportBtn" class="btn btn-secondary" type="button">Export</button>
+
+        <!-- 🔗 MX HUB NAV -->
+        <div class="tool-nav">
+          <span class="tool-nav-label">MX Hub</span>
+
+          <div class="tool-nav-links">
+            <a href="https://solidsnake2070.github.io/Suspension-Panel/" class="tool-nav-link active">
+              Suspension
+            </a>
+
+            <a href="https://solidsnake2070.github.io/Garage-Tool/" class="tool-nav-link">
+              Garage
+            </a>
+          </div>
+        </div>
+
+        <!-- Aktionen -->
+        <button id="exportBtn" class="btn btn-secondary" type="button">
+          Export
+        </button>
+
         <label class="btn btn-secondary file-btn">
           Import
           <input id="importInput" type="file" accept=".json" hidden />
         </label>
-        <button id="resetBtn" class="btn btn-danger" type="button">Reset</button>
+
+        <button id="resetBtn" class="btn btn-danger" type="button">
+          Reset
+        </button>
+
       </div>
     </header>
 
+    <!-- 🔷 MAIN -->
     <main class="layout">
+
+      <!-- 🏍 Bikes -->
       <section class="panel">
         <div class="panel-header">
           <h2>Bikes</h2>
@@ -40,215 +67,168 @@
         </div>
 
         <div class="bike-actions">
-          <button id="newBikeBtn" class="btn btn-secondary" type="button">Neues Bike</button>
-          <button id="editBikeBtn" class="btn btn-secondary" type="button">Bike bearbeiten</button>
-          <button id="deleteBikeBtn" class="btn btn-danger" type="button">Bike löschen</button>
+          <button id="newBikeBtn" class="btn btn-secondary">Neues Bike</button>
+          <button id="editBikeBtn" class="btn btn-secondary">Bike bearbeiten</button>
+          <button id="deleteBikeBtn" class="btn btn-danger">Bike löschen</button>
         </div>
 
         <div id="bikeGrid" class="bike-grid"></div>
       </section>
 
+      <!-- 📊 Aktives Setup -->
       <section class="panel">
         <div class="panel-header">
           <h2>Aktives Setup</h2>
-          <p>Kompakte Übersicht des aktuell gesetzten Setups</p>
+          <p>Kompakte Übersicht</p>
         </div>
+
         <div id="activeSetupCard" class="active-setup-card empty-state">
           Bitte zuerst ein Bike auswählen.
         </div>
       </section>
 
+      <!-- ⚙️ Editor -->
       <section class="panel">
+
         <div class="panel-header">
           <h2>Strecken-Setup</h2>
-          <p>Bike → Strecke → Bedingung</p>
+          <p>Bike → Strecke → Variante</p>
         </div>
 
+        <!-- Auswahl -->
         <div class="toolbar-grid">
+
           <div class="field">
             <label for="trackSelect">Strecke</label>
             <select id="trackSelect"></select>
           </div>
 
           <div class="field">
-            <label for="setupSelect">Variante / Bedingung</label>
+            <label for="setupSelect">Variante</label>
             <select id="setupSelect"></select>
           </div>
 
           <div class="toolbar-actions">
-            <button id="newTrackBtn" class="btn btn-secondary" type="button">Neue Strecke</button>
-            <button id="newSetupBtn" class="btn btn-secondary" type="button">Neue Variante</button>
-            <button id="duplicateSetupBtn" class="btn btn-secondary" type="button">Duplizieren</button>
+            <button id="newTrackBtn" class="btn btn-secondary">Neue Strecke</button>
+            <button id="newSetupBtn" class="btn btn-secondary">Neue Variante</button>
+            <button id="duplicateSetupBtn" class="btn btn-secondary">Duplizieren</button>
           </div>
+
         </div>
 
+        <!-- Editor -->
         <div id="editorWrap" class="editor-wrap hidden">
+
           <div class="editor-grid">
+
+            <!-- Strecke -->
             <section class="card">
-              <div class="card-header">
-                <h3>Streckendaten</h3>
+              <h3>Streckendaten</h3>
+
+              <div class="field">
+                <label>Streckenname</label>
+                <input id="trackName" type="text" />
               </div>
 
               <div class="field">
-                <label for="trackName">Streckenname</label>
-                <input id="trackName" type="text" placeholder="z. B. Süpplingen" />
+                <label>Untergrund</label>
+                <select id="trackSurface"></select>
               </div>
 
               <div class="field">
-                <label for="trackSurface">Untergrund</label>
-                <select id="trackSurface">
-                  <option value="Hartboden">Hartboden</option>
-                  <option value="Sand">Sand</option>
-                  <option value="Gemischt">Gemischt</option>
-                  <option value="Lehm">Lehm</option>
-                  <option value="Sonstiges">Sonstiges</option>
-                </select>
+                <label>Beschreibung</label>
+                <input id="trackConditionsNote" type="text" />
               </div>
 
               <div class="field">
-                <label for="trackConditionsNote">Streckentyp / Beschreibung</label>
-                <input id="trackConditionsNote" type="text" placeholder="z. B. Hartboden und Sand" />
-              </div>
-
-              <div class="field">
-                <label for="trackNotes">Streckennotiz</label>
-                <textarea id="trackNotes" rows="4" placeholder="Infos zur Strecke, Besonderheiten ..."></textarea>
+                <label>Notizen</label>
+                <textarea id="trackNotes"></textarea>
               </div>
             </section>
 
+            <!-- Setup -->
             <section class="card">
-              <div class="card-header">
-                <h3>Setup</h3>
+              <h3>Setup</h3>
+
+              <div class="field">
+                <label>Name</label>
+                <input id="setupLabel" type="text" />
               </div>
 
               <div class="field">
-                <label for="setupLabel">Bezeichnung</label>
-                <input id="setupLabel" type="text" placeholder="z. B. Trocken" />
+                <label>Wetter</label>
+                <select id="setupWeather"></select>
               </div>
 
               <div class="field">
-                <label for="setupWeather">Bedingung / Wetter</label>
-                <select id="setupWeather">
-                  <option value="Trocken">Trocken</option>
-                  <option value="Nass">Nass</option>
-                  <option value="Matschig">Matschig</option>
-                  <option value="Ausgefahren">Ausgefahren</option>
-                  <option value="Tiefer Sand">Tiefer Sand</option>
-                  <option value="Hart / Schnell">Hart / Schnell</option>
-                </select>
+                <label>Terrain</label>
+                <input id="setupTerrain" type="text" />
               </div>
 
               <div class="field">
-                <label for="setupTerrain">Passender Untergrund</label>
-                <input id="setupTerrain" type="text" placeholder="z. B. Hartboden und Sand" />
-              </div>
-
-              <div class="field">
-                <label for="setupNotes">Notizen</label>
-                <textarea id="setupNotes" rows="4" placeholder="Fahrgefühl, Änderungen, Hinweise ..."></textarea>
+                <label>Notizen</label>
+                <textarea id="setupNotes"></textarea>
               </div>
             </section>
 
+            <!-- Gabel -->
             <section class="card">
-              <div class="card-header">
-                <h3>Gabel</h3>
-              </div>
+              <h3>Gabel</h3>
 
-              <div class="field-inline">
-                <div class="field">
-                  <label for="frontCompression">Druckstufe</label>
-                  <input id="frontCompression" type="number" step="1" />
-                </div>
-                <div class="field">
-                  <label for="frontRebound">Zugstufe</label>
-                  <input id="frontRebound" type="number" step="1" />
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="forkAirPressure">Gabel-Luftdruck</label>
-                <input id="forkAirPressure" type="number" step="0.1" placeholder="z. B. 8.6" />
-              </div>
+              <input id="frontCompression" placeholder="Druckstufe" />
+              <input id="frontRebound" placeholder="Zugstufe" />
+              <input id="forkAirPressure" placeholder="Luftdruck" />
             </section>
 
+            <!-- Federbein -->
             <section class="card">
-              <div class="card-header">
-                <h3>Federbein</h3>
-              </div>
+              <h3>Federbein</h3>
 
-              <div class="field-inline">
-                <div class="field">
-                  <label for="rearLowSpeed">Low Speed</label>
-                  <input id="rearLowSpeed" type="number" step="1" />
-                </div>
-
-                <div class="field">
-                  <label for="rearHighSpeed">High Speed</label>
-                  <select id="rearHighSpeed">
-                    <option value="n.v.">n.v.</option>
-                    <option value="0.5">0.5</option>
-                    <option value="0.75">0.75</option>
-                    <option value="1">1</option>
-                    <option value="1.25">1.25</option>
-                    <option value="1.5">1.5</option>
-                    <option value="1.75">1.75</option>
-                    <option value="2">2</option>
-                    <option value="2.25">2.25</option>
-                    <option value="2.5">2.5</option>
-                    <option value="2.75">2.75</option>
-                    <option value="3">3</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="field-inline">
-                <div class="field">
-                  <label for="rearRebound">Zugstufe</label>
-                  <input id="rearRebound" type="number" step="1" />
-                </div>
-                <div class="field">
-                  <label for="rearSag">Sag / Vorspannung</label>
-                  <input id="rearSag" type="number" step="1" placeholder="z. B. 103" />
-                </div>
-              </div>
+              <input id="rearLowSpeed" placeholder="Low Speed" />
+              <select id="rearHighSpeed"></select>
+              <input id="rearRebound" placeholder="Zugstufe" />
+              <input id="rearSag" placeholder="Sag" />
             </section>
 
+            <!-- Reifen -->
             <section class="card">
-              <div class="card-header">
-                <h3>Reifenluftdruck</h3>
-              </div>
+              <h3>Reifen</h3>
 
-              <div class="field-inline">
-                <div class="field">
-                  <label for="tireFrontPressure">Reifen vorne (bar)</label>
-                  <input id="tireFrontPressure" type="number" step="0.01" />
-                </div>
-                <div class="field">
-                  <label for="tireRearPressure">Reifen hinten (bar)</label>
-                  <input id="tireRearPressure" type="number" step="0.01" />
-                </div>
-              </div>
+              <input id="tireFrontPressure" placeholder="Vorne" />
+              <input id="tireRearPressure" placeholder="Hinten" />
             </section>
 
+            <!-- Analyse -->
             <section class="card">
-              <div class="card-header">
-                <h3>Analyse</h3>
-                <p class="muted">Kompakt und praxisnah</p>
-              </div>
+              <h3>Analyse</h3>
 
-              <div id="analysisTags" class="analysis-tags"></div>
-              <div id="analysisText" class="analysis-text"></div>
+              <div id="analysisTags"></div>
+              <div id="analysisText"></div>
             </section>
+
           </div>
 
+          <!-- Aktionen -->
           <div class="editor-actions">
-            <button id="setActiveBtn" class="btn btn-primary" type="button">Als aktiv setzen</button>
-            <button id="deleteSetupBtn" class="btn btn-danger" type="button">Variante löschen</button>
-            <button id="deleteTrackBtn" class="btn btn-danger" type="button">Strecke löschen</button>
+            <button id="setActiveBtn" class="btn btn-primary">
+              Als aktiv setzen
+            </button>
+
+            <button id="deleteSetupBtn" class="btn btn-danger">
+              Variante löschen
+            </button>
+
+            <button id="deleteTrackBtn" class="btn btn-danger">
+              Strecke löschen
+            </button>
           </div>
+
         </div>
+
       </section>
+
     </main>
+
   </div>
 
   <script src="./app.js"></script>
