@@ -389,6 +389,7 @@ textarea {
     align-items: stretch;
   }
 }
+
 .tool-nav {
   display: flex;
   flex-direction: column;
