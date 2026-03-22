@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MX Suspension Tool</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -15,12 +15,12 @@
       </div>
 
       <div class="topbar-actions">
-        <button id="exportBtn" class="btn btn-secondary">Export</button>
+        <button id="exportBtn" class="btn btn-secondary" type="button">Export</button>
         <label class="btn btn-secondary file-btn">
           Import
           <input id="importInput" type="file" accept=".json" hidden />
         </label>
-        <button id="resetBtn" class="btn btn-danger">Reset</button>
+        <button id="resetBtn" class="btn btn-danger" type="button">Reset</button>
       </div>
     </header>
 
@@ -61,10 +61,10 @@
           </div>
 
           <div class="toolbar-actions">
-            <button id="newTrackBtn" class="btn btn-secondary">Neue Strecke</button>
-            <button id="newSetupBtn" class="btn btn-secondary">Neue Variante</button>
-            <button id="duplicateSetupBtn" class="btn btn-secondary">Duplizieren</button>
-            <button id="setActiveBtn" class="btn btn-primary">Als aktiv setzen</button>
+            <button id="newTrackBtn" class="btn btn-secondary" type="button">Neue Strecke</button>
+            <button id="newSetupBtn" class="btn btn-secondary" type="button">Neue Variante</button>
+            <button id="duplicateSetupBtn" class="btn btn-secondary" type="button">Duplizieren</button>
+            <button id="setActiveBtn" class="btn btn-primary" type="button">Als aktiv setzen</button>
           </div>
         </div>
 
@@ -98,7 +98,7 @@
 
               <div class="field">
                 <label for="trackNotes">Streckennotiz</label>
-                <textarea id="trackNotes" rows="4" placeholder="Infos zur Strecke, Umbauten, Besonderheiten ..."></textarea>
+                <textarea id="trackNotes" rows="4" placeholder="Infos zur Strecke, Besonderheiten ..."></textarea>
               </div>
             </section>
 
@@ -228,15 +228,15 @@
           </div>
 
           <div class="editor-actions">
-            <button id="saveBtn" class="btn btn-primary">Speichern</button>
-            <button id="deleteSetupBtn" class="btn btn-danger">Variante löschen</button>
-            <button id="deleteTrackBtn" class="btn btn-danger">Strecke löschen</button>
+            <button id="saveBtn" class="btn btn-primary" type="button">Speichern</button>
+            <button id="deleteSetupBtn" class="btn btn-danger" type="button">Variante löschen</button>
+            <button id="deleteTrackBtn" class="btn btn-danger" type="button">Strecke löschen</button>
           </div>
         </div>
       </section>
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
