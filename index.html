@@ -30,6 +30,13 @@
           <h2>Bikes</h2>
           <p>Wähle dein Motorrad</p>
         </div>
+
+        <div class="bike-actions">
+          <button id="newBikeBtn" class="btn btn-secondary" type="button">Neues Bike</button>
+          <button id="editBikeBtn" class="btn btn-secondary" type="button">Bike bearbeiten</button>
+          <button id="deleteBikeBtn" class="btn btn-danger" type="button">Bike löschen</button>
+        </div>
+
         <div id="bikeGrid" class="bike-grid"></div>
       </section>
 
@@ -64,7 +71,6 @@
             <button id="newTrackBtn" class="btn btn-secondary" type="button">Neue Strecke</button>
             <button id="newSetupBtn" class="btn btn-secondary" type="button">Neue Variante</button>
             <button id="duplicateSetupBtn" class="btn btn-secondary" type="button">Duplizieren</button>
-            <button id="setActiveBtn" class="btn btn-primary" type="button">Als aktiv setzen</button>
           </div>
         </div>
 
@@ -228,7 +234,7 @@
           </div>
 
           <div class="editor-actions">
-            <button id="saveBtn" class="btn btn-primary" type="button">Speichern</button>
+            <button id="setActiveBtn" class="btn btn-primary" type="button">Als aktiv setzen</button>
             <button id="deleteSetupBtn" class="btn btn-danger" type="button">Variante löschen</button>
             <button id="deleteTrackBtn" class="btn btn-danger" type="button">Strecke löschen</button>
           </div>
