@@ -1,314 +1,89 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
   <title>MX Suspension Tool</title>
-  <link rel="stylesheet" href="styles.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div class="topbar-left">
-        <div class="eyebrow">Garage Panel</div>
-        <h1>MX Suspension Tool</h1>
+  <div class="layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <h2>MX Hub</h2>
+
+      <nav>
+        <button class="active">Suspension</button>
+        <button>Garage</button>
+        <button>Tools</button>
+      </nav>
+
+      <div class="active-bike">
+        <p>Aktives Bike</p>
+        <strong id="activeBike">KX250F</strong>
       </div>
-      <div class="topbar-right">
-        <span id="active-bike-pill" class="pill">Kein Motorrad</span>
-      </div>
-    </header>
+    </aside>
 
-    <section class="panel bike-dashboard">
-      <div class="section-head">
-        <div>
-          <div class="section-kicker">Fahrzeug-Dashboard</div>
-          <h2>Motorräder</h2>
-        </div>
-      </div>
+    <!-- MAIN -->
+    <main class="main">
 
-      <div id="bike-cards" class="bike-cards"></div>
+      <header>
+        <h1>Suspension Tool</h1>
+      </header>
 
-      <div class="add-bike-row">
-        <input id="new-bike-input" type="text" placeholder="Neues Motorrad, z. B. KX250F 2009" />
-        <button id="add-bike-btn" class="btn btn-primary">Hinzufügen</button>
-      </div>
-    </section>
+      <!-- BIKE -->
+      <section class="card">
+        <h3>Bike Auswahl</h3>
 
-    <main class="main-grid">
-      <section class="left-col">
-        <div class="panel summary-panel">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">Aktives Setup</div>
-              <h2 id="summary-bike">Kein Motorrad</h2>
-            </div>
-          </div>
+        <div class="bike-row" id="bikeList"></div>
 
-          <div class="summary-grid">
-            <div class="summary-item">
-              <span class="label">Bereich</span>
-              <span id="summary-range" class="value">–</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Strecke</span>
-              <span id="summary-track" class="value">–</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Gabel Comp.</span>
-              <span id="summary-fc" class="value">–</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Gabel Reb.</span>
-              <span id="summary-fr" class="value">–</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Dämpfer Low</span>
-              <span id="summary-sl" class="value">–</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">Dämpfer Reb.</span>
-              <span id="summary-sr" class="value">–</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">Basisdaten</div>
-              <h2>Strecke & Setup</h2>
-            </div>
-          </div>
-
-          <div class="form-grid">
-            <div class="field full">
-              <label>Aktives Motorrad</label>
-              <div class="static-field">
-                <span id="active-bike-label">Kein Motorrad</span>
-                <button id="delete-bike-btn" class="btn btn-danger btn-small" type="button">Bike löschen</button>
-              </div>
-            </div>
-
-            <div id="custom-bike-wrap" class="field full hidden">
-              <label for="custom-bike-input">Motorrad frei eingeben</label>
-              <input id="custom-bike-input" type="text" placeholder="z. B. KX250F 2009" />
-            </div>
-
-            <div class="field">
-              <label for="track-input">Strecke</label>
-              <input id="track-input" type="text" placeholder="z. B. Tensfeld" />
-            </div>
-
-            <div class="field">
-              <label for="surface-select">Untergrund</label>
-              <select id="surface-select">
-                <option value="sand">Sand</option>
-                <option value="hardpack">Hartboden</option>
-                <option value="mixed">Mischboden</option>
-                <option value="loam">Lehm</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="weather-select">Wetter</label>
-              <select id="weather-select">
-                <option value="dry">Trocken</option>
-                <option value="damp">Feucht</option>
-                <option value="wet">Nass</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="shock-high-select">Dämpfer Highspeed</label>
-              <select id="shock-high-select">
-                <option value="n.v.">n.v.</option>
-                <option value="0.5">0.5</option>
-                <option value="1.0">1.0</option>
-                <option value="1.5">1.5</option>
-                <option value="2.0">2.0</option>
-                <option value="2.5">2.5</option>
-                <option value="3.0">3.0</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="sag-input">Sag (mm)</label>
-              <input id="sag-input" type="number" min="80" max="130" />
-            </div>
-
-            <div class="field full">
-              <label for="notes-input">Notizen</label>
-              <textarea id="notes-input" rows="4" placeholder="z. B. ruhig im Anbremsen, vorn etwas tief im Sand ..."></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel accordion open">
-          <button class="accordion-toggle" type="button" data-target="fork-content">
-            <span>Gabel</span>
-            <span class="accordion-value" id="fork-overview">Comp 12 · Reb 12</span>
-          </button>
-          <div id="fork-content" class="accordion-content">
-            <div class="slider-card">
-              <div class="slider-head">
-                <div>
-                  <div class="slider-title">Compression</div>
-                  <div class="slider-sub">Aktuell: <span id="fork-compression-value">12</span> Clicks</div>
-                </div>
-                <input id="fork-compression-number" class="number-input" type="number" min="0" max="22" />
-              </div>
-              <input id="fork-compression-range" type="range" min="0" max="22" step="1" />
-              <div class="slider-scale">
-                <span>0</span>
-                <span id="fork-compression-badge" class="slider-badge">12</span>
-                <span>22</span>
-              </div>
-            </div>
-
-            <div class="slider-card">
-              <div class="slider-head">
-                <div>
-                  <div class="slider-title">Rebound</div>
-                  <div class="slider-sub">Aktuell: <span id="fork-rebound-value">12</span> Clicks</div>
-                </div>
-                <input id="fork-rebound-number" class="number-input" type="number" min="0" max="22" />
-              </div>
-              <input id="fork-rebound-range" type="range" min="0" max="22" step="1" />
-              <div class="slider-scale">
-                <span>0</span>
-                <span id="fork-rebound-badge" class="slider-badge">12</span>
-                <span>22</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="panel accordion open">
-          <button class="accordion-toggle" type="button" data-target="shock-content">
-            <span>Dämpfer</span>
-            <span class="accordion-value" id="shock-overview">Low 12 · Reb 12 · High 1.5</span>
-          </button>
-          <div id="shock-content" class="accordion-content">
-            <div class="slider-card">
-              <div class="slider-head">
-                <div>
-                  <div class="slider-title">Lowspeed Compression</div>
-                  <div class="slider-sub">Aktuell: <span id="shock-low-value">12</span> Clicks</div>
-                </div>
-                <input id="shock-low-number" class="number-input" type="number" min="0" max="22" />
-              </div>
-              <input id="shock-low-range" type="range" min="0" max="22" step="1" />
-              <div class="slider-scale">
-                <span>0</span>
-                <span id="shock-low-badge" class="slider-badge">12</span>
-                <span>22</span>
-              </div>
-            </div>
-
-            <div class="slider-card">
-              <div class="slider-head">
-                <div>
-                  <div class="slider-title">Rebound</div>
-                  <div class="slider-sub">Aktuell: <span id="shock-rebound-value">12</span> Clicks</div>
-                </div>
-                <input id="shock-rebound-number" class="number-input" type="number" min="0" max="22" />
-              </div>
-              <input id="shock-rebound-range" type="range" min="0" max="22" step="1" />
-              <div class="slider-scale">
-                <span>0</span>
-                <span id="shock-rebound-badge" class="slider-badge">12</span>
-                <span>22</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="action-row">
-          <button id="save-setup-btn" class="btn btn-primary">Setup speichern</button>
-          <button id="reset-bike-btn" class="btn btn-secondary">Bike zurücksetzen</button>
+        <div class="add-bike">
+          <input id="newBike" placeholder="Neues Bike">
+          <button onclick="addBike()">+</button>
         </div>
       </section>
 
-      <aside class="right-col">
-        <div class="panel">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">Berechneter Einsatzbereich</div>
-              <h2>Diagramm</h2>
-            </div>
-          </div>
+      <!-- SETUP -->
+      <section class="card">
+        <h3>Setup</h3>
 
-          <div class="terrain-map">
-            <div class="axis-label top">Nass</div>
-            <div class="axis-label bottom">Trocken</div>
-            <div class="axis-label left">Hartboden</div>
-            <div class="axis-label right">Sand</div>
-            <div class="axis-v"></div>
-            <div class="axis-h"></div>
-            <div id="terrain-dot" class="terrain-dot"></div>
-          </div>
+        <label>Strecke</label>
+        <input id="track">
 
-          <div class="analysis-cards analysis-cards-large">
-            <div class="analysis-card">
-              <div class="analysis-label">Berechneter Untergrund</div>
-              <div id="analysis-surface" class="analysis-value">–</div>
-            </div>
-            <div class="analysis-card">
-              <div class="analysis-label">Berechnetes Wetter</div>
-              <div id="analysis-weather" class="analysis-value">–</div>
-            </div>
-            <div class="analysis-card">
-              <div class="analysis-label">Confidence</div>
-              <div id="analysis-confidence" class="analysis-value">–</div>
-            </div>
-            <div class="analysis-card full">
-              <div class="analysis-label">Warum der Punkt dort liegt</div>
-              <div id="analysis-reasons" class="reasons-list"></div>
-            </div>
-          </div>
+        <label>Gabel Compression</label>
+        <input type="range" id="forkComp" min="0" max="22">
+
+        <label>Gabel Rebound</label>
+        <input type="range" id="forkReb" min="0" max="22">
+
+        <label>Dämpfer Low</label>
+        <input type="range" id="shockLow" min="0" max="22">
+
+        <label>Dämpfer Rebound</label>
+        <input type="range" id="shockReb" min="0" max="22">
+
+        <button onclick="saveSetup()">Setup speichern</button>
+      </section>
+
+      <!-- ANALYSE -->
+      <section class="card">
+        <h3>Analyse</h3>
+
+        <div class="diagram">
+          <div id="point"></div>
         </div>
 
-        <div class="panel">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">Streckenübersicht</div>
-              <h2>Gespeicherte Strecken</h2>
-            </div>
-          </div>
+        <p id="analysisText"></p>
+      </section>
 
-          <div class="track-filter-row">
-            <button id="all-tracks-btn" class="btn btn-small btn-primary">Alle Strecken</button>
-          </div>
-          <div id="tracks-list" class="tracks-list"></div>
-        </div>
+      <!-- SETUPS -->
+      <section class="card">
+        <h3>Gespeicherte Setups</h3>
+        <div id="setupList"></div>
+      </section>
 
-        <div class="panel">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">Symptomhilfe</div>
-              <h2>Tipps nach Symptom</h2>
-            </div>
-          </div>
-
-          <div class="field">
-            <label for="symptom-select">Symptom auswählen</label>
-            <select id="symptom-select"></select>
-          </div>
-
-          <div id="symptom-tips" class="tips-list"></div>
-        </div>
-
-        <div class="panel">
-          <div class="section-head">
-            <div>
-              <div class="section-kicker">Setups</div>
-              <h2>Gespeicherte Setups</h2>
-            </div>
-          </div>
-
-          <div id="setups-list" class="setups-list"></div>
-        </div>
-      </aside>
     </main>
   </div>
 
