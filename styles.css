@@ -112,6 +112,13 @@ textarea {
   font-size: 0.92rem;
 }
 
+.bike-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 .bike-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
