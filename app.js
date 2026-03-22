@@ -1,541 +1,803 @@
-const STORAGE_KEY = "mx-suspension-tool-gh-blue-v1";
-const DEFAULT_BIKES = ["KX250F", "KX85", "KTM 65 SX", "SX-F 250"];
-const INITIAL_FORM = {
-  bike: "KX250F",
-  bikeCustom: "",
-  track: "",
-  surface: "mixed",
-  weather: "damp",
-  forkCompression: 12,
-  forkRebound: 12,
-  shockHigh: "1.5",
-  shockLow: 12,
-  shockRebound: 12,
-  sag: 105,
-  notes: "",
+const STORAGE_KEY = "mxSuspensionToolData_v2";
+
+const DEFAULT_DATA = {
+  version: 2,
+  lastUpdated: new Date().toISOString(),
+  selectedBikeId: "kx250f",
+  bikes: [
+    {
+      id: "kx85",
+      name: "KX85",
+      brand: "Kawasaki",
+      color: "#63ff85",
+      notes: "",
+      activeSetupRef: {
+        trackId: null,
+        setupId: null
+      },
+      tracks: []
+    },
+    {
+      id: "kx250f",
+      name: "KX250F",
+      brand: "Kawasaki",
+      color: "#63ff85",
+      notes: "",
+      activeSetupRef: {
+        trackId: "suepplingen",
+        setupId: "suepplingen-dry-standard"
+      },
+      tracks: [
+        {
+          id: "suepplingen",
+          name: "Süpplingen",
+          surface: "Gemischt",
+          conditionsNote: "Hartboden und Sand",
+          notes: "Gemischter Untergrund. Je nach Wetter sehr unterschiedlich.",
+          setups: [
+            {
+              id: "suepplingen-dry-standard",
+              label: "Trocken",
+              weather: "Trocken",
+              terrain: "Hartboden und Sand",
+              isActive: true,
+              lastUsed: "2026-03-22T10:00:00.000Z",
+              suspension: {
+                front: {
+                  compression: 12,
+                  rebound: 14,
+                  forkAirPressure: null
+                },
+                rear: {
+                  lowSpeedCompression: 10,
+                  highSpeedCompression: "1.5",
+                  rebound: 12,
+                  sag: 103
+                }
+              },
+              tires: {
+                frontPressureBar: 0.95,
+                rearPressureBar: 1.0
+              },
+              notes: "Gutes Grundsetup für trockene Bedingungen. Vorne stabil beim Einlenken.",
+              analysis: {}
+            },
+            {
+              id: "suepplingen-wet-soft",
+              label: "Nass",
+              weather: "Nass",
+              terrain: "Hartboden und Sand",
+              isActive: false,
+              lastUsed: null,
+              suspension: {
+                front: {
+                  compression: 10,
+                  rebound: 13,
+                  forkAirPressure: null
+                },
+                rear: {
+                  lowSpeedCompression: 9,
+                  highSpeedCompression: "1.75",
+                  rebound: 11,
+                  sag: 104
+                }
+              },
+              tires: {
+                frontPressureBar: 0.9,
+                rearPressureBar: 0.95
+              },
+              notes: "Etwas weicher für mehr Traktion auf nassem Untergrund.",
+              analysis: {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      id: "ktm-sx65",
+      name: "KTM SX65",
+      brand: "KTM",
+      color: "#ff9a4d",
+      notes: "",
+      activeSetupRef: {
+        trackId: null,
+        setupId: null
+      },
+      tracks: []
+    }
+  ]
 };
 
-const SYMPTOM_GUIDE = {
-  neutral: {
-    label: "Kein Symptom ausgewählt",
-    tips: [
-      "Das Diagramm bewertet X und Y getrennt. So sind auch Kombinationen wie Hartboden/Trocken oder Sand/Nass möglich.",
-      "Nimm das aktuelle Setup als Basis und wähle bei Bedarf ein Fahrgefühl-Symptom aus.",
-      "Die Tipps sind bewusst kurz gehalten und können später fahrzeugspezifisch werden."
-    ]
-  },
-  turn_in: {
-    label: "Lenkt schlecht ein",
-    tips: [
-      "Gabel leicht durchschieben, damit mehr Last aufs Vorderrad kommt.",
-      "Vorn etwas weicher oder hinten leicht höher beziehungsweise weniger Sag prüfen.",
-      "Reifendruck und Reifenbild immer mitdenken, nicht nur Clicks ändern."
-    ]
-  },
-  front_sand_push: {
-    label: "Vorderrad rutscht im Sand weg",
-    tips: [
-      "Setup tendenziell etwas Richtung Hartboden verschieben, damit das Vorderrad besser führt.",
-      "Die Gabel nicht unnötig weich abstimmen, damit das Vorderrad mehr Support hat.",
-      "Zusätzlich Fahrerposition und Last auf dem Vorderrad prüfen."
-    ]
-  },
-  rear_kick: {
-    label: "Heck kickt über Kanten",
-    tips: [
-      "Shock-Rebound prüfen. Oft etwas schneller öffnen lassen, wenn das Heck stehen bleibt und dann schlägt.",
-      "High-Speed hinten nicht zu straff fahren, wenn harte Schläge das Bike aushebeln.",
-      "Sag kontrollieren, weil ein unpassender Grundstand viele Symptome verfälscht."
-    ]
-  },
-  harsh_front: {
-    label: "Vorne hart oder unruhig",
-    tips: [
-      "Gabel-Compression etwas öffnen und prüfen, ob kleine Schläge besser gefiltert werden.",
-      "Zu langsamer Rebound kann die Gabel packen lassen. Rebound nicht nur bei Compression anschauen.",
-      "Servicezustand und Ölstand der Gabel später ebenfalls erfassen."
-    ]
-  },
-  lazy_rear: {
-    label: "Heck schwammig oder träge",
-    tips: [
-      "Weniger Sag oder etwas mehr Low-Speed hinten testen.",
-      "Zu weiche Basis hinten kann das Bike in langen Kurven breit machen.",
-      "Nur kleine Schritte ändern und danach direkt eine kurze Vergleichsrunde fahren."
-    ]
-  }
-};
+let appState = loadData();
+let selectedTrackId = null;
+let selectedSetupId = null;
 
-const state = {
-  bikes: [...DEFAULT_BIKES],
-  setups: [],
-  bikeDrafts: {},
-  form: { ...INITIAL_FORM },
-  selectedTrack: "__all__",
-  selectedSymptom: "neutral"
-};
+const bikeGrid = document.getElementById("bikeGrid");
+const activeSetupCard = document.getElementById("activeSetupCard");
 
-function $(id) { return document.getElementById(id); }
-function clamp(value, min, max) { return Math.min(max, Math.max(min, Number(value) || 0)); }
-function clampFloat(value, min, max) { return Math.min(max, Math.max(min, Number(value) || 0)); }
-function getHighspeedNumeric(value) { return value === "n.v." ? 1.5 : clampFloat(value, 0.5, 3.0); }
-function createBikeDraft(bikeName) { return { ...INITIAL_FORM, bike: bikeName, bikeCustom: bikeName === "__custom__" ? "" : "" }; }
-function mapWeatherLabel(score) { if (score <= 24) return "Nass"; if (score <= 42) return "Feucht"; if (score <= 60) return "Neutral"; if (score <= 78) return "Trocken"; return "Sehr trocken"; }
-function mapSurfaceLabel(score) { if (score <= 22) return "Hartboden"; if (score <= 40) return "Hart/Misch"; if (score <= 60) return "Mischboden"; if (score <= 78) return "Lehmig"; return "Sand"; }
-function setupLabel(surface, weather) { return `${surface} · ${weather}`; }
+const trackSelect = document.getElementById("trackSelect");
+const setupSelect = document.getElementById("setupSelect");
 
-function getResolvedBike() {
-  return state.form.bike === "__custom__" ? state.form.bikeCustom.trim() : state.form.bike;
+const newTrackBtn = document.getElementById("newTrackBtn");
+const newSetupBtn = document.getElementById("newSetupBtn");
+const duplicateSetupBtn = document.getElementById("duplicateSetupBtn");
+const setActiveBtn = document.getElementById("setActiveBtn");
+const saveBtn = document.getElementById("saveBtn");
+const deleteSetupBtn = document.getElementById("deleteSetupBtn");
+const deleteTrackBtn = document.getElementById("deleteTrackBtn");
+
+const exportBtn = document.getElementById("exportBtn");
+const importInput = document.getElementById("importInput");
+const resetBtn = document.getElementById("resetBtn");
+
+const editorWrap = document.getElementById("editorWrap");
+
+const trackName = document.getElementById("trackName");
+const trackSurface = document.getElementById("trackSurface");
+const trackConditionsNote = document.getElementById("trackConditionsNote");
+const trackNotes = document.getElementById("trackNotes");
+
+const setupLabel = document.getElementById("setupLabel");
+const setupWeather = document.getElementById("setupWeather");
+const setupTerrain = document.getElementById("setupTerrain");
+const setupNotes = document.getElementById("setupNotes");
+
+const frontCompression = document.getElementById("frontCompression");
+const frontRebound = document.getElementById("frontRebound");
+const forkAirPressure = document.getElementById("forkAirPressure");
+
+const rearLowSpeed = document.getElementById("rearLowSpeed");
+const rearHighSpeed = document.getElementById("rearHighSpeed");
+const rearRebound = document.getElementById("rearRebound");
+const rearSag = document.getElementById("rearSag");
+
+const tireFrontPressure = document.getElementById("tireFrontPressure");
+const tireRearPressure = document.getElementById("tireRearPressure");
+
+const analysisTags = document.getElementById("analysisTags");
+const analysisText = document.getElementById("analysisText");
+
+function cloneDefaultData() {
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
 
-function getActiveBikeKey() {
-  if (state.form.bike === "__custom__") {
-    return state.form.bikeCustom.trim() ? `custom:${state.form.bikeCustom.trim()}` : "__custom__";
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return cloneDefaultData();
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error("Fehler beim Laden:", error);
+    return cloneDefaultData();
   }
-  return state.form.bike;
 }
 
-function getSetupAnalysis(form) {
-  const forkCompNorm = form.forkCompression / 22;
-  const forkRebNorm = form.forkRebound / 22;
-  const shockLowNorm = form.shockLow / 22;
-  const shockRebNorm = form.shockRebound / 22;
-  const shockHighNorm = (getHighspeedNumeric(form.shockHigh) - 0.5) / 2.5;
-  const sagNorm = (clamp(form.sag, 90, 120) - 90) / 30;
+function saveData() {
+  appState.lastUpdated = new Date().toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+}
 
-  const frontFirmness = forkCompNorm * 0.55 + forkRebNorm * 0.25 + (1 - sagNorm) * 0.2;
-  const rearFirmness = shockLowNorm * 0.45 + shockHighNorm * 0.3 + shockRebNorm * 0.15 + (1 - sagNorm) * 0.1;
-  const overallFirmness = frontFirmness * 0.52 + rearFirmness * 0.48;
+function uid(prefix = "id") {
+  if (window.crypto && crypto.randomUUID) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
 
-  const holdUpBias = (1 - sagNorm) * 0.45 + shockHighNorm * 0.2 + shockLowNorm * 0.15 + forkRebNorm * 0.1 + shockRebNorm * 0.1;
-  const plushBias = sagNorm * 0.4 + (1 - shockHighNorm) * 0.2 + (1 - shockLowNorm) * 0.2 + (1 - forkCompNorm) * 0.2;
-  const cornerBias = forkCompNorm * 0.3 + forkRebNorm * 0.18 + (1 - sagNorm) * 0.22 + (1 - shockHighNorm) * 0.08 + (1 - shockLowNorm) * 0.1 + (1 - shockRebNorm) * 0.12;
-  const stabilityBias = shockHighNorm * 0.22 + shockLowNorm * 0.22 + shockRebNorm * 0.18 + sagNorm * 0.18 + forkCompNorm * 0.1 + forkRebNorm * 0.1;
+function getSelectedBike() {
+  return appState.bikes.find((bike) => bike.id === appState.selectedBikeId) || null;
+}
 
-  const x = clamp(Math.round(50 + (stabilityBias - cornerBias) * 55 + (overallFirmness - 0.5) * 18), 10, 90);
-  const y = clamp(Math.round(50 + (holdUpBias - plushBias) * 55), 10, 90);
-  const reasons = [];
-  if (forkCompNorm >= 0.68) reasons.push("straffe Gabel-Compression");
-  if (shockLowNorm >= 0.68) reasons.push("straffes Low-Speed hinten");
-  if (shockHighNorm >= 0.6) reasons.push("viel High-Speed-Dämpfung");
-  if (sagNorm <= 0.35) reasons.push("wenig Sag / mehr Hold-up");
-  if (forkCompNorm <= 0.36) reasons.push("weiche Gabel-Compression");
-  if (shockLowNorm <= 0.36) reasons.push("weiches Low-Speed hinten");
-  if (shockHighNorm <= 0.24) reasons.push("wenig High-Speed-Dämpfung");
-  if (sagNorm >= 0.62) reasons.push("mehr Sag / mehr Ruhe hinten");
-  if (forkRebNorm >= 0.68) reasons.push("langsamerer Gabel-Rebound");
-  if (shockRebNorm >= 0.68) reasons.push("langsamerer Shock-Rebound");
+function getTrackById(bike, trackId) {
+  return bike?.tracks.find((track) => track.id === trackId) || null;
+}
 
+function getSetupById(track, setupId) {
+  return track?.setups.find((setup) => setup.id === setupId) || null;
+}
+
+function getActiveSetup(bike) {
+  if (!bike || !bike.activeSetupRef.trackId || !bike.activeSetupRef.setupId) return null;
+  const track = getTrackById(bike, bike.activeSetupRef.trackId);
+  const setup = getSetupById(track, bike.activeSetupRef.setupId);
+  if (!track || !setup) return null;
+  return { track, setup };
+}
+
+function createEmptyTrack(name = "Neue Strecke") {
   return {
-    x, y,
-    surfaceLabel: mapSurfaceLabel(x),
-    weatherLabel: mapWeatherLabel(y),
-    confidence: Math.round(58 + Math.abs(overallFirmness - 0.5) * 45 + Math.abs(holdUpBias - plushBias) * 15),
-    reasons: reasons.slice(0, 5),
-    firmness: Math.round(overallFirmness * 100),
-    holdUp: Math.round(holdUpBias * 100)
+    id: uid("track"),
+    name,
+    surface: "Gemischt",
+    conditionsNote: "",
+    notes: "",
+    setups: []
   };
 }
 
-function runSanityChecks() {
-  console.assert(clamp(30, 0, 22) === 22, "clamp upper bound failed");
-  console.assert(clamp(-5, 0, 22) === 0, "clamp lower bound failed");
-  console.assert(getHighspeedNumeric("n.v.") === 1.5, "highspeed n.v. mapping failed");
-  console.assert(getHighspeedNumeric("3.5") === 3, "highspeed clamp max failed");
-  console.assert(getHighspeedNumeric("0") === 0.5, "highspeed clamp min failed");
-  const neutral = getSetupAnalysis(INITIAL_FORM);
-  console.assert(neutral.x >= 10 && neutral.x <= 90, "analysis x out of range");
-  console.assert(neutral.y >= 10 && neutral.y <= 90, "analysis y out of range");
-  console.assert(typeof neutral.surfaceLabel === "string", "surface label missing");
-  console.assert(typeof neutral.weatherLabel === "string", "weather label missing");
-  const stiff = getSetupAnalysis({ ...INITIAL_FORM, forkCompression: 22, forkRebound: 22, shockLow: 22, shockRebound: 22, shockHigh: "3.0", sag: 90 });
-  console.assert(stiff.x >= neutral.x, "stiff setup should not move left of neutral unexpectedly");
+function createEmptySetup(label = "Neue Variante") {
+  return {
+    id: uid("setup"),
+    label,
+    weather: "Trocken",
+    terrain: "",
+    isActive: false,
+    lastUsed: null,
+    suspension: {
+      front: {
+        compression: null,
+        rebound: null,
+        forkAirPressure: null
+      },
+      rear: {
+        lowSpeedCompression: null,
+        highSpeedCompression: "n.v.",
+        rebound: null,
+        sag: null
+      }
+    },
+    tires: {
+      frontPressureBar: null,
+      rearPressureBar: null
+    },
+    notes: "",
+    analysis: {}
+  };
 }
 
-function saveStorage() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ bikes: state.bikes, setups: state.setups, bikeDrafts: state.bikeDrafts }));
+function formatValue(value, fallback = "—") {
+  return value === null || value === undefined || value === "" ? fallback : value;
 }
 
-function loadStorage() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return;
-  try {
-    const data = JSON.parse(raw);
-    if (Array.isArray(data.bikes)) state.bikes = data.bikes;
-    if (Array.isArray(data.setups)) state.setups = data.setups;
-    if (data.bikeDrafts && typeof data.bikeDrafts === "object") state.bikeDrafts = data.bikeDrafts;
-  } catch (error) {
-    console.warn("Konnte lokalen Speicher nicht laden", error);
-  }
-}
+function renderBikes() {
+  bikeGrid.innerHTML = "";
 
-function persistActiveDraft() {
-  const key = getActiveBikeKey();
-  if (!key) return;
-  state.bikeDrafts[key] = { ...state.form };
-  saveStorage();
-}
+  appState.bikes.forEach((bike) => {
+    const active = getActiveSetup(bike);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `bike-card ${bike.id === appState.selectedBikeId ? "active" : ""}`;
+    card.style.setProperty("--bike-color", bike.color || "#4da3ff");
 
-function getBikeSetups() {
-  const resolvedBike = getResolvedBike();
-  if (!resolvedBike) return [];
-  return state.setups.filter(entry => entry.bike === resolvedBike);
-}
+    const activeText = active ? `${active.track.name} · ${active.setup.label}` : "Kein aktives Setup";
 
-function getBikeTracks() {
-  const grouped = new Map();
-  getBikeSetups().forEach(entry => {
-    const key = entry.track?.trim() || "Ohne Strecke";
-    if (!grouped.has(key)) grouped.set(key, { name: key, count: 0, latest: entry.createdAt });
-    const current = grouped.get(key);
-    current.count += 1;
-    if (new Date(entry.createdAt) > new Date(current.latest)) current.latest = entry.createdAt;
+    card.innerHTML = `
+      <div class="bike-name">${bike.name}</div>
+      <div class="bike-meta">${bike.brand}</div>
+      <div class="bike-meta" style="margin-top: 10px;">${activeText}</div>
+    `;
+
+    card.addEventListener("click", () => {
+      appState.selectedBikeId = bike.id;
+      selectedTrackId = null;
+      selectedSetupId = null;
+      saveData();
+      renderAll();
+    });
+
+    bikeGrid.appendChild(card);
   });
-  return Array.from(grouped.values()).sort((a, b) => new Date(b.latest) - new Date(a.latest));
 }
 
-function getVisibleSetups() {
-  const bikeSetups = getBikeSetups();
-  if (state.selectedTrack === "__all__") return bikeSetups;
-  return bikeSetups.filter(entry => (entry.track?.trim() || "Ohne Strecke") === state.selectedTrack);
-}
+function renderActiveSetupCard() {
+  const bike = getSelectedBike();
 
-function switchBike(bikeName) {
-  state.selectedTrack = "__all__";
-  const existingDraft = state.bikeDrafts[bikeName];
-  state.form = existingDraft ? { ...existingDraft } : createBikeDraft(bikeName);
-  render();
-}
-
-function addBike() {
-  const name = $("newBikeInput").value.trim();
-  if (!name) return;
-  if (state.bikes.includes(name)) {
-    switchBike(name);
-    $("newBikeInput").value = "";
+  if (!bike) {
+    activeSetupCard.className = "active-setup-card empty-state";
+    activeSetupCard.textContent = "Bitte zuerst ein Bike auswählen.";
     return;
   }
-  state.bikes.push(name);
-  state.bikeDrafts[name] = createBikeDraft(name);
-  state.form = createBikeDraft(name);
-  state.selectedTrack = "__all__";
-  $("newBikeInput").value = "";
-  saveStorage();
-  render();
-}
 
-function deleteBike() {
-  const bikeName = getResolvedBike()?.trim();
-  if (!bikeName || state.form.bike === "__custom__") return;
-  const confirmed = window.confirm(`Motorrad "${bikeName}" inklusive zugehöriger gespeicherter Setups löschen?`);
-  if (!confirmed) return;
-  state.bikes = state.bikes.filter(b => b !== bikeName);
-  state.setups = state.setups.filter(entry => entry.bike !== bikeName);
-  delete state.bikeDrafts[bikeName];
-  state.selectedTrack = "__all__";
-  if (state.bikes.length > 0) {
-    const nextBike = state.bikes[0];
-    state.form = state.bikeDrafts[nextBike] ? { ...state.bikeDrafts[nextBike] } : createBikeDraft(nextBike);
-  } else {
-    state.form = createBikeDraft("__custom__");
+  const active = getActiveSetup(bike);
+
+  if (!active) {
+    activeSetupCard.className = "active-setup-card empty-state";
+    activeSetupCard.textContent = "Für dieses Bike ist noch kein aktives Setup gesetzt.";
+    return;
   }
-  saveStorage();
-  render();
-}
 
-function saveSetup() {
-  const bikeName = getResolvedBike().trim();
-  if (!bikeName) return;
-  const analysis = getSetupAnalysis(state.form);
-  const entry = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    bike: bikeName,
-    track: state.form.track.trim(),
-    surface: state.form.surface,
-    weather: state.form.weather,
-    forkCompression: state.form.forkCompression,
-    forkRebound: state.form.forkRebound,
-    shockHigh: state.form.shockHigh,
-    shockLow: state.form.shockLow,
-    shockRebound: state.form.shockRebound,
-    sag: state.form.sag,
-    notes: state.form.notes.trim(),
-    derivedSurface: analysis.surfaceLabel,
-    derivedWeather: analysis.weatherLabel,
-    derivedX: analysis.x,
-    derivedY: analysis.y
-  };
-  state.setups.unshift(entry);
-  state.selectedTrack = entry.track || "Ohne Strecke";
-  saveStorage();
-  render();
-}
+  const { track, setup } = active;
+  const analysis = calculateAnalysis(setup);
 
-function loadSetup(entryId) {
-  const entry = state.setups.find(item => item.id === entryId);
-  if (!entry) return;
-  state.form = {
-    bike: state.bikes.includes(entry.bike) ? entry.bike : "__custom__",
-    bikeCustom: state.bikes.includes(entry.bike) ? "" : entry.bike,
-    track: entry.track,
-    surface: entry.surface || "mixed",
-    weather: entry.weather || "damp",
-    forkCompression: entry.forkCompression,
-    forkRebound: entry.forkRebound,
-    shockHigh: entry.shockHigh,
-    shockLow: entry.shockLow,
-    shockRebound: entry.shockRebound,
-    sag: entry.sag,
-    notes: entry.notes
-  };
-  state.selectedTrack = entry.track?.trim() || "Ohne Strecke";
-  persistActiveDraft();
-  render();
-}
-
-function deleteSetup(entryId) {
-  state.setups = state.setups.filter(entry => entry.id !== entryId);
-  saveStorage();
-  render();
-}
-
-function resetBikeDraft() {
-  state.form = createBikeDraft(state.form.bike);
-  persistActiveDraft();
-  render();
-}
-
-function bindForm() {
-  $("track").addEventListener("input", e => { state.form.track = e.target.value; persistActiveDraft(); renderSummaryOnly(); renderTrackSections(); });
-  $("bikeCustom").addEventListener("input", e => { state.form.bikeCustom = e.target.value; persistActiveDraft(); render(); });
-  $("surface").addEventListener("change", e => { state.form.surface = e.target.value; persistActiveDraft(); });
-  $("weather").addEventListener("change", e => { state.form.weather = e.target.value; persistActiveDraft(); });
-  $("shockHigh").addEventListener("change", e => { state.form.shockHigh = e.target.value; persistActiveDraft(); renderAnalysis(); renderSummaryOnly(); });
-  $("sag").addEventListener("input", e => { state.form.sag = clamp(e.target.value, 80, 130); persistActiveDraft(); renderAnalysis(); renderSummaryOnly(); e.target.value = state.form.sag; });
-  $("notes").addEventListener("input", e => { state.form.notes = e.target.value; persistActiveDraft(); });
-  $("addBikeBtn").addEventListener("click", addBike);
-  $("deleteBikeBtn").addEventListener("click", deleteBike);
-  $("saveSetupBtn").addEventListener("click", saveSetup);
-  $("resetBikeBtn").addEventListener("click", resetBikeDraft);
-  $("symptomSelect").addEventListener("change", e => { state.selectedSymptom = e.target.value; renderSymptomTips(); });
-}
-
-function createSliderCard({ label, key, min = 0, max = 22 }) {
-  const value = state.form[key];
-  const pct = ((value - min) / (max - min)) * 100;
-  const wrapper = document.createElement("div");
-  wrapper.className = "slider-card";
-  wrapper.innerHTML = `
-    <div class="slider-head">
-      <strong>${label}</strong>
-      <div class="slider-value-box">
-        <input type="number" min="${min}" max="${max}" value="${value}" />
-        <span class="subtle small">Clicks</span>
+  activeSetupCard.className = "active-setup-card";
+  activeSetupCard.innerHTML = `
+    <div class="active-title-row">
+      <div>
+        <div class="active-title">${bike.name} · ${setup.label}</div>
+        <div class="muted">Zuletzt / aktiv für: ${track.name} · ${setup.weather}</div>
+      </div>
+      <div class="badge-row">
+        <span class="badge">${track.surface}</span>
+        <span class="badge">${setup.terrain || track.conditionsNote || "ohne Angabe"}</span>
       </div>
     </div>
-    <input type="range" min="${min}" max="${max}" step="1" value="${value}" />
-    <div class="slider-track-visual">
-      <div class="slider-line"></div>
-      <div class="slider-marker" style="left:${pct}%"></div>
-      <div class="slider-scale"><span>${min}</span><span class="current">${value}</span><span>${max}</span></div>
+
+    <div class="active-columns">
+      <div class="compact-block">
+        <h4>Gabel</h4>
+        <div class="compact-list">
+          <div>Druckstufe: ${formatValue(setup.suspension.front.compression)}</div>
+          <div>Zugstufe: ${formatValue(setup.suspension.front.rebound)}</div>
+          <div>Luftdruck: ${formatValue(setup.suspension.front.forkAirPressure)}</div>
+        </div>
+      </div>
+
+      <div class="compact-block">
+        <h4>Federbein</h4>
+        <div class="compact-list">
+          <div>Low Speed: ${formatValue(setup.suspension.rear.lowSpeedCompression)}</div>
+          <div>High Speed: ${formatValue(setup.suspension.rear.highSpeedCompression)}</div>
+          <div>Zugstufe: ${formatValue(setup.suspension.rear.rebound)}</div>
+          <div>Sag: ${formatValue(setup.suspension.rear.sag)}</div>
+        </div>
+      </div>
+
+      <div class="compact-block">
+        <h4>Reifen</h4>
+        <div class="compact-list">
+          <div>Vorne: ${formatValue(setup.tires.frontPressureBar)}</div>
+          <div>Hinten: ${formatValue(setup.tires.rearPressureBar)}</div>
+        </div>
+      </div>
+
+      <div class="compact-block">
+        <h4>Analyse</h4>
+        <div class="badge-row">
+          ${analysis.tags.map((tag) => `<span class="badge">${tag}</span>`).join("")}
+        </div>
+        <div class="compact-list" style="margin-top:10px;">
+          <div>${analysis.text}</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 14px; color: #dce8ff;">
+      <strong>Notiz:</strong> ${setup.notes || "Keine Notiz vorhanden."}
     </div>
   `;
-  const numberInput = wrapper.querySelector('input[type="number"]');
-  const rangeInput = wrapper.querySelector('input[type="range"]');
-  const setValue = next => {
-    state.form[key] = clamp(next, min, max);
-    persistActiveDraft();
-    render();
+}
+
+function renderTrackOptions() {
+  const bike = getSelectedBike();
+  trackSelect.innerHTML = "";
+
+  if (!bike) {
+    trackSelect.innerHTML = `<option value="">Kein Bike gewählt</option>`;
+    setupSelect.innerHTML = `<option value="">Keine Variante</option>`;
+    editorWrap.classList.add("hidden");
+    return;
+  }
+
+  if (!bike.tracks.length) {
+    trackSelect.innerHTML = `<option value="">Keine Strecke vorhanden</option>`;
+    setupSelect.innerHTML = `<option value="">Keine Variante</option>`;
+    selectedTrackId = null;
+    selectedSetupId = null;
+    editorWrap.classList.add("hidden");
+    return;
+  }
+
+  if (!selectedTrackId || !getTrackById(bike, selectedTrackId)) {
+    selectedTrackId =
+      bike.activeSetupRef.trackId && getTrackById(bike, bike.activeSetupRef.trackId)
+        ? bike.activeSetupRef.trackId
+        : bike.tracks[0].id;
+  }
+
+  bike.tracks.forEach((track) => {
+    const option = document.createElement("option");
+    option.value = track.id;
+    option.textContent = track.name;
+    trackSelect.appendChild(option);
+  });
+
+  trackSelect.value = selectedTrackId;
+  renderSetupOptions();
+}
+
+function renderSetupOptions() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+
+  setupSelect.innerHTML = "";
+
+  if (!track) {
+    setupSelect.innerHTML = `<option value="">Keine Variante</option>`;
+    selectedSetupId = null;
+    editorWrap.classList.add("hidden");
+    return;
+  }
+
+  if (!track.setups.length) {
+    setupSelect.innerHTML = `<option value="">Keine Variante vorhanden</option>`;
+    selectedSetupId = null;
+    editorWrap.classList.add("hidden");
+    return;
+  }
+
+  if (!selectedSetupId || !getSetupById(track, selectedSetupId)) {
+    const activeId = bike.activeSetupRef.setupId;
+    const activeInTrack = track.setups.find((setup) => setup.id === activeId);
+    selectedSetupId = activeInTrack ? activeInTrack.id : track.setups[0].id;
+  }
+
+  track.setups.forEach((setup) => {
+    const option = document.createElement("option");
+    option.value = setup.id;
+    option.textContent = `${setup.label} · ${setup.weather}`;
+    setupSelect.appendChild(option);
+  });
+
+  setupSelect.value = selectedSetupId;
+  renderEditor();
+}
+
+function renderEditor() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+  const setup = getSetupById(track, selectedSetupId);
+
+  if (!bike || !track || !setup) {
+    editorWrap.classList.add("hidden");
+    return;
+  }
+
+  editorWrap.classList.remove("hidden");
+
+  trackName.value = track.name || "";
+  trackSurface.value = track.surface || "Gemischt";
+  trackConditionsNote.value = track.conditionsNote || "";
+  trackNotes.value = track.notes || "";
+
+  setupLabel.value = setup.label || "";
+  setupWeather.value = setup.weather || "Trocken";
+  setupTerrain.value = setup.terrain || "";
+  setupNotes.value = setup.notes || "";
+
+  frontCompression.value = setup.suspension.front.compression ?? "";
+  frontRebound.value = setup.suspension.front.rebound ?? "";
+  forkAirPressure.value = setup.suspension.front.forkAirPressure ?? "";
+
+  rearLowSpeed.value = setup.suspension.rear.lowSpeedCompression ?? "";
+  rearHighSpeed.value = setup.suspension.rear.highSpeedCompression ?? "n.v.";
+  rearRebound.value = setup.suspension.rear.rebound ?? "";
+  rearSag.value = setup.suspension.rear.sag ?? "";
+
+  tireFrontPressure.value = setup.tires.frontPressureBar ?? "";
+  tireRearPressure.value = setup.tires.rearPressureBar ?? "";
+
+  renderAnalysis(calculateAnalysis(setup));
+}
+
+function renderAnalysis(analysis) {
+  analysisTags.innerHTML = analysis.tags.map((tag) => `<span class="badge">${tag}</span>`).join("");
+  analysisText.textContent = analysis.text;
+}
+
+function calculateAnalysis(setup) {
+  const fc = Number(setup.suspension.front.compression);
+  const fr = Number(setup.suspension.front.rebound);
+  const rls = Number(setup.suspension.rear.lowSpeedCompression);
+  const rr = Number(setup.suspension.rear.rebound);
+  const sag = Number(setup.suspension.rear.sag);
+
+  const tags = [];
+
+  if (!Number.isNaN(fc) && !Number.isNaN(rls)) {
+    const avg = (fc + rls) / 2;
+    if (avg <= 9) tags.push("eher weich");
+    else if (avg <= 13) tags.push("neutral");
+    else tags.push("eher straff");
+  }
+
+  if (!Number.isNaN(fr) && !Number.isNaN(rr)) {
+    const reboundAvg = (fr + rr) / 2;
+    if (reboundAvg <= 10) tags.push("lebendig");
+    else if (reboundAvg <= 14) tags.push("ruhig");
+    else tags.push("sehr ruhig");
+  }
+
+  if (!Number.isNaN(sag)) {
+    if (sag < 100) tags.push("heck hoch");
+    else if (sag <= 106) tags.push("sag im bereich");
+    else tags.push("heck tief");
+  }
+
+  if (setup.weather) tags.push(setup.weather.toLowerCase());
+  if (setup.terrain) tags.push(setup.terrain);
+
+  const parts = [];
+
+  if (tags.includes("eher weich")) {
+    parts.push("Das Setup wirkt insgesamt eher weich und dürfte auf losem oder unruhigem Untergrund mehr Komfort und Traktion bieten.");
+  } else if (tags.includes("neutral")) {
+    parts.push("Das Setup wirkt ausgewogen und sollte als guter Allround-Ausgangspunkt funktionieren.");
+  } else if (tags.includes("eher straff")) {
+    parts.push("Das Setup wirkt eher straff und passt tendenziell besser zu schnellen, härteren Bedingungen.");
+  }
+
+  if (tags.includes("lebendig")) {
+    parts.push("Die Zugstufe wirkt eher offen, das Motorrad könnte schneller zurückkommen und aktiver reagieren.");
+  } else if (tags.includes("ruhig")) {
+    parts.push("Die Zugstufe liegt in einem ruhigen Bereich und sollte ein kontrolliertes Fahrgefühl unterstützen.");
+  } else if (tags.includes("sehr ruhig")) {
+    parts.push("Die Zugstufe wirkt recht langsam, was Stabilität bringen kann, aber auf engen Wellen träge wirken könnte.");
+  }
+
+  if (tags.includes("heck hoch")) {
+    parts.push("Der Sag deutet auf ein eher hohes Heck hin, was Einlenken fördern kann.");
+  } else if (tags.includes("heck tief")) {
+    parts.push("Der Sag deutet auf ein eher tiefes Heck hin, was Stabilität bringen kann, aber das Einlenken träger machen könnte.");
+  }
+
+  return {
+    tags,
+    text: parts.length ? parts.join(" ") : "Keine Analyse vorhanden."
   };
-  numberInput.addEventListener("input", e => setValue(e.target.value));
-  rangeInput.addEventListener("input", e => setValue(e.target.value));
-  return wrapper;
 }
 
-function renderBikeTiles() {
-  const container = $("bikeTiles");
-  container.innerHTML = "";
-  const bikes = [...state.bikes, "__custom__"];
-  bikes.forEach(bike => {
-    const isCustom = bike === "__custom__";
-    const active = state.form.bike === bike;
-    const el = document.createElement("button");
-    el.className = `bike-tile ${active ? "active" : ""}`;
-    el.innerHTML = `
-      <div class="bike-tile-top">
-        <div class="bike-icon">${isCustom ? "＋" : "🏍️"}</div>
-        ${active ? '<span class="pill pill-primary">Aktiv</span>' : ""}
-      </div>
-      <div class="bike-tile-title">${isCustom ? "Eigenes Bike" : bike}</div>
-      <div class="bike-tile-subtitle">${isCustom ? "Neues Motorrad anlegen" : "Setup laden und bearbeiten"}</div>
-    `;
-    el.addEventListener("click", () => switchBike(bike));
-    container.appendChild(el);
-  });
+function parseNumber(value) {
+  return value === "" ? null : Number(value);
 }
 
-function renderSummaryOnly() {
-  const analysis = getSetupAnalysis(state.form);
-  const resolvedBike = getResolvedBike() || "Kein Motorrad";
-  $("activeBikeBadge").textContent = resolvedBike;
-  $("summaryBike").textContent = resolvedBike;
-  $("activeBikeName").textContent = resolvedBike;
-  $("summarySurface").textContent = setupLabel(analysis.surfaceLabel, analysis.weatherLabel);
-  $("summaryTrack").textContent = state.form.track.trim() || "Ohne Strecke";
-  $("deleteBikeBtn").style.display = state.form.bike === "__custom__" ? "none" : "inline-flex";
-  $("customBikeField").classList.toggle("hidden", state.form.bike !== "__custom__");
+function collectEditorDataIntoObjects() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+  const setup = getSetupById(track, selectedSetupId);
 
-  const stats = [
-    ["Gabel Comp.", state.form.forkCompression],
-    ["Gabel Reb.", state.form.forkRebound],
-    ["Shock High", state.form.shockHigh],
-    ["Shock Low", state.form.shockLow],
-    ["Shock Reb.", state.form.shockRebound],
-    ["Sag", `${state.form.sag} mm`]
-  ];
-  $("summaryStats").innerHTML = stats.map(([label, value]) => `<div class="summary-stat"><div class="label">${label}</div><div class="value">${value}</div></div>`).join("");
+  if (!track || !setup) return;
+
+  track.name = trackName.value.trim() || "Neue Strecke";
+  track.surface = trackSurface.value;
+  track.conditionsNote = trackConditionsNote.value.trim();
+  track.notes = trackNotes.value.trim();
+
+  setup.label = setupLabel.value.trim() || "Neue Variante";
+  setup.weather = setupWeather.value;
+  setup.terrain = setupTerrain.value.trim();
+  setup.notes = setupNotes.value.trim();
+
+  setup.suspension.front.compression = parseNumber(frontCompression.value);
+  setup.suspension.front.rebound = parseNumber(frontRebound.value);
+  setup.suspension.front.forkAirPressure = parseNumber(forkAirPressure.value);
+
+  setup.suspension.rear.lowSpeedCompression = parseNumber(rearLowSpeed.value);
+  setup.suspension.rear.highSpeedCompression = rearHighSpeed.value;
+  setup.suspension.rear.rebound = parseNumber(rearRebound.value);
+  setup.suspension.rear.sag = parseNumber(rearSag.value);
+
+  setup.tires.frontPressureBar = parseNumber(tireFrontPressure.value);
+  setup.tires.rearPressureBar = parseNumber(tireRearPressure.value);
+
+  setup.analysis = calculateAnalysis(setup);
 }
 
-function renderAnalysis() {
-  const analysis = getSetupAnalysis(state.form);
-  $("mapDot").style.left = `${analysis.x}%`;
-  $("mapDot").style.top = `${analysis.y}%`;
-  $("analysisSurfaceLabel").textContent = analysis.surfaceLabel;
-  $("analysisWeatherLabel").textContent = analysis.weatherLabel;
-  $("analysisConfidence").textContent = `Treffer ${analysis.confidence}%`;
-  $("analysisSurfaceMini").textContent = analysis.surfaceLabel;
-  $("analysisWeatherMini").textContent = analysis.weatherLabel;
-  $("analysisFirmness").textContent = `${analysis.firmness}%`;
-  $("analysisHoldUp").textContent = `${analysis.holdUp}%`;
-  $("analysisReasons").innerHTML = analysis.reasons.length ? analysis.reasons.map(reason => `<span class="tag">${reason}</span>`).join("") : '<span class="tag">Aktuell eher neutrales Basis-Setup.</span>';
+function saveCurrentEditor() {
+  collectEditorDataIntoObjects();
+  saveData();
+  renderAll();
 }
 
-function renderTrackSections() {
-  const tracks = getBikeTracks();
-  const filterRow = $("trackFilterRow");
-  filterRow.innerHTML = "";
+function createNewTrack() {
+  const bike = getSelectedBike();
+  if (!bike) return;
 
-  const allBtn = document.createElement("button");
-  allBtn.className = `btn ${state.selectedTrack === "__all__" ? "btn-primary" : "btn-secondary"}`;
-  allBtn.textContent = "Alle Strecken";
-  allBtn.addEventListener("click", () => { state.selectedTrack = "__all__"; renderTrackSections(); });
-  filterRow.appendChild(allBtn);
+  const name = window.prompt("Name der neuen Strecke:", "Neue Strecke");
+  if (!name) return;
 
-  tracks.forEach(track => {
-    const btn = document.createElement("button");
-    btn.className = `btn ${state.selectedTrack === track.name ? "btn-primary" : "btn-secondary"}`;
-    btn.textContent = `${track.name} (${track.count})`;
-    btn.addEventListener("click", () => { state.selectedTrack = track.name; renderTrackSections(); });
-    filterRow.appendChild(btn);
-  });
+  const track = createEmptyTrack(name.trim());
+  const setup = createEmptySetup("Standard");
+  track.setups.push(setup);
 
-  const list = $("trackList");
-  list.innerHTML = "";
-  if (!tracks.length) {
-    list.innerHTML = '<div class="track-item"><div class="track-meta">Für dieses Bike gibt es noch keine gespeicherten Strecken-Setups.</div></div>';
-  } else {
-    tracks.forEach(track => {
-      const item = document.createElement("button");
-      item.className = `track-item ${state.selectedTrack === track.name ? "active" : ""}`;
-      item.innerHTML = `
-        <div class="track-top">
-          <div class="track-left">
-            <div class="track-icon">📁</div>
-            <div>
-              <div><strong>${track.name}</strong></div>
-              <div class="track-meta">${track.count} gespeicherte Setups</div>
-            </div>
-          </div>
-          <div class="track-meta">${new Date(track.latest).toLocaleDateString("de-DE")}</div>
-        </div>
-      `;
-      item.addEventListener("click", () => { state.selectedTrack = track.name; renderTrackSections(); });
-      list.appendChild(item);
+  bike.tracks.push(track);
+
+  selectedTrackId = track.id;
+  selectedSetupId = setup.id;
+
+  saveData();
+  renderAll();
+}
+
+function createNewSetup() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+  if (!track) return;
+
+  const label = window.prompt("Name der neuen Variante:", "Neue Variante");
+  if (!label) return;
+
+  const setup = createEmptySetup(label.trim());
+  setup.terrain = track.conditionsNote || "";
+  track.setups.push(setup);
+
+  selectedSetupId = setup.id;
+
+  saveData();
+  renderAll();
+}
+
+function duplicateCurrentSetup() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+  const setup = getSetupById(track, selectedSetupId);
+
+  if (!track || !setup) return;
+
+  const copy = JSON.parse(JSON.stringify(setup));
+  copy.id = uid("setup");
+  copy.label = `${setup.label} Kopie`;
+  copy.isActive = false;
+  copy.lastUsed = null;
+
+  track.setups.push(copy);
+  selectedSetupId = copy.id;
+
+  saveData();
+  renderAll();
+}
+
+function setActiveSetup() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+  const setup = getSetupById(track, selectedSetupId);
+
+  if (!bike || !track || !setup) return;
+
+  appState.bikes.forEach((bikeItem) => {
+    bikeItem.tracks.forEach((trackItem) => {
+      trackItem.setups.forEach((setupItem) => {
+        setupItem.isActive = false;
+      });
     });
+  });
+
+  setup.isActive = true;
+  setup.lastUsed = new Date().toISOString();
+
+  bike.activeSetupRef = {
+    trackId: track.id,
+    setupId: setup.id
+  };
+
+  saveData();
+  renderAll();
+}
+
+function deleteCurrentSetup() {
+  const bike = getSelectedBike();
+  const track = getTrackById(bike, selectedTrackId);
+  if (!track || !selectedSetupId) return;
+
+  if (track.setups.length <= 1) {
+    window.alert("Die letzte Variante einer Strecke kann nicht gelöscht werden. Lösche stattdessen die ganze Strecke.");
+    return;
   }
 
-  const setups = getVisibleSetups();
-  const saved = $("savedSetups");
-  saved.innerHTML = "";
-  if (!setups.length) {
-    saved.innerHTML = `<div class="setup-item"><div class="track-meta">Keine Setups für diese Auswahl gespeichert.</div></div>`;
-  } else {
-    setups.forEach(entry => {
-      const item = document.createElement("div");
-      item.className = "setup-item";
-      item.innerHTML = `
-        <div class="setup-top">
-          <div>
-            <div><strong>${entry.track || "Ohne Strecke"}</strong></div>
-            <div class="setup-meta">${new Date(entry.createdAt).toLocaleDateString("de-DE")} · ${setupLabel(entry.derivedSurface || "—", entry.derivedWeather || "—")}</div>
-          </div>
-        </div>
-        <div class="setup-values">
-          <div>Fork Comp.: <strong>${entry.forkCompression}</strong></div>
-          <div>Fork Reb.: <strong>${entry.forkRebound}</strong></div>
-          <div>Shock High: <strong>${entry.shockHigh}</strong></div>
-          <div>Shock Low: <strong>${entry.shockLow}</strong></div>
-          <div>Shock Reb.: <strong>${entry.shockRebound}</strong></div>
-          <div>Sag: <strong>${entry.sag} mm</strong></div>
-        </div>
-        ${entry.notes ? `<div class="setup-meta" style="margin-top:10px;">${entry.notes}</div>` : ""}
-        <div class="setup-actions">
-          <button class="btn btn-secondary load-btn">Laden</button>
-          <button class="btn btn-danger delete-btn">Löschen</button>
-        </div>
-      `;
-      item.querySelector(".load-btn").addEventListener("click", () => loadSetup(entry.id));
-      item.querySelector(".delete-btn").addEventListener("click", () => deleteSetup(entry.id));
-      saved.appendChild(item);
-    });
+  const index = track.setups.findIndex((setup) => setup.id === selectedSetupId);
+  if (index === -1) return;
+
+  const toDelete = track.setups[index];
+
+  if (!window.confirm(`Variante "${toDelete.label}" wirklich löschen?`)) return;
+
+  track.setups.splice(index, 1);
+
+  if (bike.activeSetupRef.setupId === toDelete.id) {
+    const fallback = track.setups[0];
+    fallback.isActive = true;
+    bike.activeSetupRef = {
+      trackId: track.id,
+      setupId: fallback.id
+    };
   }
+
+  selectedSetupId = track.setups[0]?.id || null;
+
+  saveData();
+  renderAll();
 }
 
-function renderSymptomTips() {
-  const symptom = SYMPTOM_GUIDE[state.selectedSymptom];
-  $("symptomSelect").value = state.selectedSymptom;
-  $("symptomTips").innerHTML = symptom.tips.map(tip => `<div class="tip-item">${tip}</div>`).join("");
+function deleteCurrentTrack() {
+  const bike = getSelectedBike();
+  if (!bike || !selectedTrackId) return;
+
+  const index = bike.tracks.findIndex((track) => track.id === selectedTrackId);
+  if (index === -1) return;
+
+  const track = bike.tracks[index];
+
+  if (!window.confirm(`Strecke "${track.name}" wirklich löschen?`)) return;
+
+  bike.tracks.splice(index, 1);
+
+  if (bike.activeSetupRef.trackId === track.id) {
+    bike.activeSetupRef = {
+      trackId: null,
+      setupId: null
+    };
+  }
+
+  selectedTrackId = bike.tracks[0]?.id || null;
+  selectedSetupId = selectedTrackId ? bike.tracks[0].setups[0]?.id || null : null;
+
+  saveData();
+  renderAll();
 }
 
-function renderFormControls() {
-  $("track").value = state.form.track;
-  $("bikeCustom").value = state.form.bikeCustom;
-  $("surface").value = state.form.surface;
-  $("weather").value = state.form.weather;
-  $("shockHigh").value = state.form.shockHigh;
-  $("sag").value = state.form.sag;
-  $("notes").value = state.form.notes;
+function exportAppData() {
+  const blob = new Blob([JSON.stringify(appState, null, 2)], {
+    type: "application/json"
+  });
 
-  const fork = $("forkSliders");
-  fork.innerHTML = "";
-  fork.appendChild(createSliderCard({ label: "Compression", key: "forkCompression" }));
-  fork.appendChild(createSliderCard({ label: "Rebound", key: "forkRebound" }));
-
-  const shock = $("shockSliders");
-  shock.innerHTML = "";
-  shock.appendChild(createSliderCard({ label: "Lowspeed Compression", key: "shockLow" }));
-  shock.appendChild(createSliderCard({ label: "Rebound", key: "shockRebound" }));
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mx-suspension-data.json";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function renderSymptomSelect() {
-  const select = $("symptomSelect");
-  select.innerHTML = Object.entries(SYMPTOM_GUIDE).map(([key, value]) => `<option value="${key}">${value.label}</option>`).join("");
-  select.value = state.selectedSymptom;
+function importAppData(file) {
+  const reader = new FileReader();
+
+  reader.onload = (event) => {
+    try {
+      const imported = JSON.parse(event.target.result);
+      appState = imported;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+      selectedTrackId = null;
+      selectedSetupId = null;
+      renderAll();
+      window.alert("Import erfolgreich.");
+    } catch (error) {
+      console.error(error);
+      window.alert("Import fehlgeschlagen. Bitte prüfe die JSON-Datei.");
+    }
+  };
+
+  reader.readAsText(file);
 }
 
-function render() {
-  persistActiveDraft();
-  renderBikeTiles();
-  renderFormControls();
-  renderSummaryOnly();
-  renderAnalysis();
-  renderTrackSections();
-  renderSymptomSelect();
-  renderSymptomTips();
+function resetData() {
+  if (!window.confirm("Wirklich alle lokalen Daten zurücksetzen?")) return;
+  appState = cloneDefaultData();
+  selectedTrackId = null;
+  selectedSetupId = null;
+  saveData();
+  renderAll();
 }
 
-runSanityChecks();
-loadStorage();
-bindForm();
-render();
+function renderAll() {
+  renderBikes();
+  renderActiveSetupCard();
+  renderTrackOptions();
+}
+
+trackSelect.addEventListener("change", () => {
+  selectedTrackId = trackSelect.value || null;
+  selectedSetupId = null;
+  renderSetupOptions();
+});
+
+setupSelect.addEventListener("change", () => {
+  selectedSetupId = setupSelect.value || null;
+  renderEditor();
+});
+
+newTrackBtn.addEventListener("click", createNewTrack);
+newSetupBtn.addEventListener("click", createNewSetup);
+duplicateSetupBtn.addEventListener("click", duplicateCurrentSetup);
+setActiveBtn.addEventListener("click", setActiveSetup);
+saveBtn.addEventListener("click", saveCurrentEditor);
+deleteSetupBtn.addEventListener("click", deleteCurrentSetup);
+deleteTrackBtn.addEventListener("click", deleteCurrentTrack);
+
+exportBtn.addEventListener("click", exportAppData);
+importInput.addEventListener("change", (event) => {
+  const file = event.target.files?.[0];
+  if (file) importAppData(file);
+  event.target.value = "";
+});
+resetBtn.addEventListener("click", resetData);
+
+renderAll();
