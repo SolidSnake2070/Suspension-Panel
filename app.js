@@ -115,6 +115,10 @@ let selectedSetupId = null;
 const bikeGrid = document.getElementById("bikeGrid");
 const activeSetupCard = document.getElementById("activeSetupCard");
 
+const newBikeBtn = document.getElementById("newBikeBtn");
+const editBikeBtn = document.getElementById("editBikeBtn");
+const deleteBikeBtn = document.getElementById("deleteBikeBtn");
+
 const trackSelect = document.getElementById("trackSelect");
 const setupSelect = document.getElementById("setupSelect");
 
@@ -122,7 +126,6 @@ const newTrackBtn = document.getElementById("newTrackBtn");
 const newSetupBtn = document.getElementById("newSetupBtn");
 const duplicateSetupBtn = document.getElementById("duplicateSetupBtn");
 const setActiveBtn = document.getElementById("setActiveBtn");
-const saveBtn = document.getElementById("saveBtn");
 const deleteSetupBtn = document.getElementById("deleteSetupBtn");
 const deleteTrackBtn = document.getElementById("deleteTrackBtn");
 
@@ -572,8 +575,86 @@ function collectEditorDataIntoObjects() {
   setup.analysis = calculateAnalysis(setup);
 }
 
-function saveCurrentEditor() {
-  collectEditorDataIntoObjects();
+function createNewBike() {
+  const name = window.prompt("Name des neuen Fahrzeugs:", "Neues Bike");
+  if (!name) return;
+
+  const brand = window.prompt("Marke:", "Kawasaki");
+  if (brand === null) return;
+
+  const color = window.prompt("Akzentfarbe als Hexwert:", "#4da3ff");
+  if (color === null) return;
+
+  const bike = {
+    id: uid("bike"),
+    name: name.trim(),
+    brand: brand.trim(),
+    color: color.trim() || "#4da3ff",
+    notes: "",
+    activeSetupRef: {
+      trackId: null,
+      setupId: null
+    },
+    tracks: []
+  };
+
+  appState.bikes.push(bike);
+  appState.selectedBikeId = bike.id;
+  selectedTrackId = null;
+  selectedSetupId = null;
+
+  saveData();
+  renderAll();
+}
+
+function editSelectedBike() {
+  const bike = getSelectedBike();
+  if (!bike) {
+    window.alert("Kein Bike ausgewählt.");
+    return;
+  }
+
+  const name = window.prompt("Neuer Name des Fahrzeugs:", bike.name);
+  if (!name) return;
+
+  const brand = window.prompt("Marke:", bike.brand || "");
+  if (brand === null) return;
+
+  const color = window.prompt("Akzentfarbe als Hexwert:", bike.color || "#4da3ff");
+  if (color === null) return;
+
+  bike.name = name.trim() || bike.name;
+  bike.brand = brand.trim();
+  bike.color = color.trim() || "#4da3ff";
+
+  saveData();
+  renderAll();
+}
+
+function deleteSelectedBike() {
+  const bike = getSelectedBike();
+  if (!bike) {
+    window.alert("Kein Bike ausgewählt.");
+    return;
+  }
+
+  if (appState.bikes.length <= 1) {
+    window.alert("Das letzte Fahrzeug kann nicht gelöscht werden.");
+    return;
+  }
+
+  if (!window.confirm(`Fahrzeug "${bike.name}" wirklich löschen?`)) return;
+
+  const index = appState.bikes.findIndex((item) => item.id === bike.id);
+  if (index === -1) return;
+
+  appState.bikes.splice(index, 1);
+
+  const fallbackBike = appState.bikes[0] || null;
+  appState.selectedBikeId = fallbackBike ? fallbackBike.id : null;
+  selectedTrackId = null;
+  selectedSetupId = null;
+
   saveData();
   renderAll();
 }
@@ -623,6 +704,8 @@ function duplicateCurrentSetup() {
 
   if (!track || !setup) return;
 
+  collectEditorDataIntoObjects();
+
   const copy = JSON.parse(JSON.stringify(setup));
   copy.id = uid("setup");
   copy.label = `${setup.label} Kopie`;
@@ -642,6 +725,8 @@ function setActiveSetup() {
   const setup = getSetupById(track, selectedSetupId);
 
   if (!bike || !track || !setup) return;
+
+  collectEditorDataIntoObjects();
 
   appState.bikes.forEach((bikeItem) => {
     bikeItem.tracks.forEach((trackItem) => {
@@ -784,11 +869,14 @@ setupSelect.addEventListener("change", () => {
   renderEditor();
 });
 
+newBikeBtn.addEventListener("click", createNewBike);
+editBikeBtn.addEventListener("click", editSelectedBike);
+deleteBikeBtn.addEventListener("click", deleteSelectedBike);
+
 newTrackBtn.addEventListener("click", createNewTrack);
 newSetupBtn.addEventListener("click", createNewSetup);
 duplicateSetupBtn.addEventListener("click", duplicateCurrentSetup);
 setActiveBtn.addEventListener("click", setActiveSetup);
-saveBtn.addEventListener("click", saveCurrentEditor);
 deleteSetupBtn.addEventListener("click", deleteCurrentSetup);
 deleteTrackBtn.addEventListener("click", deleteCurrentTrack);
 
