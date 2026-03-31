@@ -1,208 +1,82 @@
-const STORAGE_KEY = "mx-suspension-tool-github-v3";
+const STORAGE_KEY = "mx-suspension-clean-v1";
+const GARAGE_URL = "https://solidsnake2070.github.io/Garage-Tool/";
 
 const DEFAULT_BIKES = ["KX250F", "KX85", "KTM 65 SX", "SX-F 250"];
+const CONDITIONS = ["trocken", "nass", "feucht"];
 
-const INITIAL_FORM = {
-  bike: "KX250F",
-  bikeCustom: "",
-  track: "",
-  surface: "mixed",
-  weather: "damp",
-  forkCompression: 12,
+const DEFAULT_BIKE_CONFIG = {
+  forkPressureMax: 22,
+  forkReboundMax: 22,
+  shockSeparate: false,
+  shockPressureMax: 22,
+  shockLowMax: 22,
+  shockReboundMax: 22,
+};
+
+const DEFAULT_SETUP = {
+  forkPressure: 12,
   forkRebound: 12,
+  shockPressure: 12,
   shockHigh: "1.5",
   shockLow: 12,
   shockRebound: 12,
-  sag: 105,
+  forkHeight: 0,
   notes: "",
-};
-
-const SYMPTOM_GUIDE = {
-  neutral: {
-    label: "Kein Symptom ausgewählt",
-    tips: [
-      "Das Diagramm bewertet X und Y getrennt. So sind auch Kombinationen wie Hartboden/Trocken oder Sand/Nass möglich.",
-      "Nimm das aktuelle Setup als Basis und wähle bei Bedarf ein Fahrgefühl-Symptom aus.",
-      "Die Tipps sind bewusst kurz gehalten und sollen später durch fahrzeugspezifische Regeln ergänzt werden.",
-    ],
-  },
-  turn_in: {
-    label: "Lenkt schlecht ein",
-    tips: [
-      "Gabel leicht durchschieben, damit mehr Last aufs Vorderrad kommt.",
-      "Vorn etwas weicher oder hinten leicht höher beziehungsweise weniger Sag prüfen.",
-      "Reifendruck und Reifenbild immer mitdenken, nicht nur Clicks ändern.",
-    ],
-  },
-  front_sand_push: {
-    label: "Vorderrad rutscht im Sand weg",
-    tips: [
-      "Setup tendenziell etwas Richtung Hartboden verschieben, damit das Vorderrad besser führt.",
-      "Die Gabel nicht unnötig weich abstimmen, damit das Vorderrad mehr Support hat.",
-      "Zusätzlich Fahrerposition und Last auf dem Vorderrad prüfen.",
-    ],
-  },
-  rear_kick: {
-    label: "Heck kickt über Kanten",
-    tips: [
-      "Shock-Rebound prüfen. Oft etwas schneller öffnen lassen, wenn das Heck stehen bleibt und dann schlägt.",
-      "High-Speed hinten nicht zu straff fahren, wenn harte Schläge das Bike aushebeln.",
-      "Sag kontrollieren, weil ein unpassender Grundstand viele Symptome verfälscht.",
-    ],
-  },
-  harsh_front: {
-    label: "Vorne hart oder unruhig",
-    tips: [
-      "Gabel-Compression etwas öffnen und prüfen, ob kleine Schläge besser gefiltert werden.",
-      "Zu langsamer Rebound kann die Gabel packen lassen. Rebound nicht nur bei Compression anschauen.",
-      "Servicezustand und Ölstand der Gabel später ebenfalls erfassen.",
-    ],
-  },
-  lazy_rear: {
-    label: "Heck schwammig oder träge",
-    tips: [
-      "Weniger Sag oder etwas mehr Low-Speed hinten testen.",
-      "Zu weiche Basis hinten kann das Bike in langen Kurven breit machen.",
-      "Nur kleine Schritte ändern und danach direkt eine kurze Vergleichsrunde fahren.",
-    ],
-  },
 };
 
 const state = {
   bikes: [...DEFAULT_BIKES],
-  bikeDrafts: {},
-  setups: [],
-  form: { ...INITIAL_FORM },
-  selectedTrack: "__all__",
-  selectedSymptom: "neutral",
+  tracksByBike: {},
+  bikeConfigs: {},
+  selectedBike: DEFAULT_BIKES[0],
+  selectedTrack: "",
+  selectedCondition: "",
+  setups: {},
 };
 
+function deepCopy(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
 function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, Number(value) || 0));
+  const n = Number(value);
+  if (Number.isNaN(n)) return min;
+  return Math.min(max, Math.max(min, n));
 }
 
-function clampFloat(value, min, max) {
-  return Math.min(max, Math.max(min, Number(value) || 0));
+function getSetupKey(bike, track, condition) {
+  return `${bike}__${track}__${condition}`;
 }
 
-function getHighspeedNumeric(value) {
-  if (value === "n.v.") return 1.5;
-  return clampFloat(value, 0.5, 3.0);
+function ensureBikeExists(bike) {
+  if (!bike) return;
+  if (!state.tracksByBike[bike]) state.tracksByBike[bike] = [];
+  if (!state.bikeConfigs[bike]) state.bikeConfigs[bike] = deepCopy(DEFAULT_BIKE_CONFIG);
+  if (!state.bikes.includes(bike)) state.bikes.push(bike);
 }
 
-function createBikeDraft(bikeName) {
-  return {
-    ...INITIAL_FORM,
-    bike: bikeName,
-    bikeCustom: bikeName === "__custom__" ? "" : "",
-  };
+function currentSetupKey() {
+  if (!state.selectedBike || !state.selectedTrack || !state.selectedCondition) return null;
+  return getSetupKey(state.selectedBike, state.selectedTrack, state.selectedCondition);
 }
 
-function resolvedBikeName() {
-  return state.form.bike === "__custom__"
-    ? state.form.bikeCustom.trim()
-    : state.form.bike;
+function ensureCurrentSetupExists() {
+  const key = currentSetupKey();
+  if (!key) return null;
+  if (!state.setups[key]) state.setups[key] = deepCopy(DEFAULT_SETUP);
+  return key;
 }
 
-function activeBikeKey() {
-  if (state.form.bike === "__custom__") {
-    const name = state.form.bikeCustom.trim();
-    return name ? `custom:${name}` : "__custom__";
-  }
-  return state.form.bike;
+function getCurrentSetup() {
+  const key = ensureCurrentSetupExists();
+  if (!key) return deepCopy(DEFAULT_SETUP);
+  return state.setups[key];
 }
 
-function mapWeatherLabel(score) {
-  if (score <= 24) return "Nass";
-  if (score <= 42) return "Feucht";
-  if (score <= 60) return "Neutral";
-  if (score <= 78) return "Trocken";
-  return "Sehr trocken";
-}
-
-function mapSurfaceLabel(score) {
-  if (score <= 22) return "Hartboden";
-  if (score <= 40) return "Hart/Misch";
-  if (score <= 60) return "Mischboden";
-  if (score <= 78) return "Lehmig";
-  return "Sand";
-}
-
-function getSetupAnalysis(form) {
-  const forkCompNorm = form.forkCompression / 22;
-  const forkRebNorm = form.forkRebound / 22;
-  const shockLowNorm = form.shockLow / 22;
-  const shockRebNorm = form.shockRebound / 22;
-  const shockHighNorm = (getHighspeedNumeric(form.shockHigh) - 0.5) / 2.5;
-  const sagNorm = (clamp(form.sag, 90, 120) - 90) / 30;
-
-  const frontFirmness =
-    forkCompNorm * 0.55 + forkRebNorm * 0.25 + (1 - sagNorm) * 0.2;
-  const rearFirmness =
-    shockLowNorm * 0.45 +
-    shockHighNorm * 0.3 +
-    shockRebNorm * 0.15 +
-    (1 - sagNorm) * 0.1;
-  const overallFirmness = frontFirmness * 0.52 + rearFirmness * 0.48;
-
-  const holdUpBias =
-    (1 - sagNorm) * 0.45 +
-    shockHighNorm * 0.2 +
-    shockLowNorm * 0.15 +
-    forkRebNorm * 0.1 +
-    shockRebNorm * 0.1;
-
-  const plushBias =
-    sagNorm * 0.4 +
-    (1 - shockHighNorm) * 0.2 +
-    (1 - shockLowNorm) * 0.2 +
-    (1 - forkCompNorm) * 0.2;
-
-  const cornerBias =
-    forkCompNorm * 0.3 +
-    forkRebNorm * 0.18 +
-    (1 - sagNorm) * 0.22 +
-    (1 - shockHighNorm) * 0.08 +
-    (1 - shockLowNorm) * 0.1 +
-    (1 - shockRebNorm) * 0.12;
-
-  const stabilityBias =
-    shockHighNorm * 0.22 +
-    shockLowNorm * 0.22 +
-    shockRebNorm * 0.18 +
-    sagNorm * 0.18 +
-    forkCompNorm * 0.1 +
-    forkRebNorm * 0.1;
-
-  const x = clamp(
-    Math.round(50 + (stabilityBias - cornerBias) * 55 + (overallFirmness - 0.5) * 18),
-    10,
-    90
-  );
-  const y = clamp(Math.round(50 + (holdUpBias - plushBias) * 55), 10, 90);
-
-  const reasons = [];
-  if (forkCompNorm >= 0.68) reasons.push("straffe Gabel-Compression");
-  if (shockLowNorm >= 0.68) reasons.push("straffes Low-Speed hinten");
-  if (shockHighNorm >= 0.6) reasons.push("viel High-Speed-Dämpfung");
-  if (sagNorm <= 0.35) reasons.push("wenig Sag / mehr Hold-up");
-  if (forkCompNorm <= 0.36) reasons.push("weiche Gabel-Compression");
-  if (shockLowNorm <= 0.36) reasons.push("weiches Low-Speed hinten");
-  if (shockHighNorm <= 0.24) reasons.push("wenig High-Speed-Dämpfung");
-  if (sagNorm >= 0.62) reasons.push("mehr Sag / mehr Ruhe hinten");
-  if (forkRebNorm >= 0.68) reasons.push("langsamerer Gabel-Rebound");
-  if (shockRebNorm >= 0.68) reasons.push("langsamerer Shock-Rebound");
-
-  return {
-    x,
-    y,
-    surfaceLabel: mapSurfaceLabel(x),
-    weatherLabel: mapWeatherLabel(y),
-    confidence: Math.round(
-      58 + Math.abs(overallFirmness - 0.5) * 45 + Math.abs(holdUpBias - plushBias) * 15
-    ),
-    reasons: reasons.slice(0, 5),
-  };
+function getCurrentBikeConfig() {
+  if (!state.selectedBike) return deepCopy(DEFAULT_BIKE_CONFIG);
+  ensureBikeExists(state.selectedBike);
+  return state.bikeConfigs[state.selectedBike];
 }
 
 function saveState() {
@@ -210,7 +84,11 @@ function saveState() {
     STORAGE_KEY,
     JSON.stringify({
       bikes: state.bikes,
-      bikeDrafts: state.bikeDrafts,
+      tracksByBike: state.tracksByBike,
+      bikeConfigs: state.bikeConfigs,
+      selectedBike: state.selectedBike,
+      selectedTrack: state.selectedTrack,
+      selectedCondition: state.selectedCondition,
       setups: state.setups,
     })
   );
@@ -219,198 +97,26 @@ function saveState() {
 function loadState() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    state.form = { ...INITIAL_FORM };
-    state.bikeDrafts[state.form.bike] = { ...state.form };
+    ensureBikeExists(state.selectedBike);
     return;
   }
 
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.bikes)) state.bikes = parsed.bikes;
-    if (parsed.bikeDrafts && typeof parsed.bikeDrafts === "object") {
-      state.bikeDrafts = parsed.bikeDrafts;
-    }
-    if (Array.isArray(parsed.setups)) state.setups = parsed.setups;
-  } catch (error) {
-    console.warn("Speicher konnte nicht geladen werden", error);
+
+    if (Array.isArray(parsed.bikes) && parsed.bikes.length) state.bikes = parsed.bikes;
+    if (parsed.tracksByBike && typeof parsed.tracksByBike === "object") state.tracksByBike = parsed.tracksByBike;
+    if (parsed.bikeConfigs && typeof parsed.bikeConfigs === "object") state.bikeConfigs = parsed.bikeConfigs;
+    if (typeof parsed.selectedBike === "string") state.selectedBike = parsed.selectedBike;
+    if (typeof parsed.selectedTrack === "string") state.selectedTrack = parsed.selectedTrack;
+    if (typeof parsed.selectedCondition === "string") state.selectedCondition = parsed.selectedCondition;
+    if (parsed.setups && typeof parsed.setups === "object") state.setups = parsed.setups;
+  } catch (e) {
+    console.warn("Fehler beim Laden", e);
   }
 
-  const firstBike = state.bikes[0] || "__custom__";
-  state.form = state.bikeDrafts[firstBike]
-    ? { ...state.bikeDrafts[firstBike] }
-    : createBikeDraft(firstBike);
-}
-
-function syncDraft() {
-  state.bikeDrafts[activeBikeKey()] = { ...state.form };
-  saveState();
-}
-
-function switchBike(bikeName) {
-  state.selectedTrack = "__all__";
-  const draft = state.bikeDrafts[bikeName];
-  state.form = draft ? { ...draft } : createBikeDraft(bikeName);
-  render();
-}
-
-function deleteBike() {
-  const bikeName = resolvedBikeName();
-  if (!bikeName || state.form.bike === "__custom__") return;
-
-  const confirmed = window.confirm(
-    `Motorrad "${bikeName}" inklusive zugehöriger gespeicherter Setups löschen?`
-  );
-  if (!confirmed) return;
-
-  state.bikes = state.bikes.filter((b) => b !== bikeName);
-  state.setups = state.setups.filter((s) => s.bike !== bikeName);
-  delete state.bikeDrafts[bikeName];
-
-  const nextBike = state.bikes[0] || "__custom__";
-  state.form = state.bikeDrafts[nextBike]
-    ? { ...state.bikeDrafts[nextBike] }
-    : createBikeDraft(nextBike);
-
-  state.selectedTrack = "__all__";
-  saveState();
-  render();
-}
-
-function addBike() {
-  const input = document.getElementById("newBikeInput");
-  const name = input.value.trim();
-  if (!name) return;
-
-  if (!state.bikes.includes(name)) {
-    state.bikes.push(name);
-    state.bikeDrafts[name] = createBikeDraft(name);
-  }
-
-  input.value = "";
-  switchBike(name);
-}
-
-function currentBikeSetups() {
-  const bike = resolvedBikeName();
-  if (!bike) return [];
-  return state.setups.filter((entry) => entry.bike === bike);
-}
-
-function currentVisibleSetups() {
-  const setups = currentBikeSetups();
-  if (state.selectedTrack === "__all__") return setups;
-  return setups.filter(
-    (entry) => ((entry.track || "").trim() || "Ohne Strecke") === state.selectedTrack
-  );
-}
-
-function groupedTracks() {
-  const map = new Map();
-  currentBikeSetups().forEach((entry) => {
-    const key = (entry.track || "").trim() || "Ohne Strecke";
-    if (!map.has(key)) {
-      map.set(key, { name: key, count: 0, latest: entry.createdAt });
-    }
-    const current = map.get(key);
-    current.count += 1;
-    if (new Date(entry.createdAt) > new Date(current.latest)) {
-      current.latest = entry.createdAt;
-    }
-  });
-  return Array.from(map.values()).sort(
-    (a, b) => new Date(b.latest) - new Date(a.latest)
-  );
-}
-
-function saveSetup() {
-  const bikeName = resolvedBikeName();
-  if (!bikeName) {
-    alert("Bitte zuerst ein Motorrad wählen oder eingeben.");
-    return;
-  }
-
-  const analysis = getSetupAnalysis(state.form);
-
-  const entry = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    bike: bikeName,
-    track: state.form.track.trim(),
-    surface: state.form.surface,
-    weather: state.form.weather,
-    forkCompression: state.form.forkCompression,
-    forkRebound: state.form.forkRebound,
-    shockHigh: state.form.shockHigh,
-    shockLow: state.form.shockLow,
-    shockRebound: state.form.shockRebound,
-    sag: state.form.sag,
-    notes: state.form.notes.trim(),
-    derivedSurface: analysis.surfaceLabel,
-    derivedWeather: analysis.weatherLabel,
-    derivedX: analysis.x,
-    derivedY: analysis.y,
-  };
-
-  state.setups.unshift(entry);
-  state.selectedTrack = entry.track || "Ohne Strecke";
-  saveState();
-  render();
-}
-
-function loadSetup(entryId) {
-  const entry = state.setups.find((s) => s.id === entryId);
-  if (!entry) return;
-
-  if (!state.bikes.includes(entry.bike) && entry.bike) {
-    state.form.bike = "__custom__";
-    state.form.bikeCustom = entry.bike;
-  } else {
-    state.form.bike = entry.bike;
-    state.form.bikeCustom = "";
-  }
-
-  state.form.track = entry.track || "";
-  state.form.surface = entry.surface || "mixed";
-  state.form.weather = entry.weather || "damp";
-  state.form.forkCompression = entry.forkCompression;
-  state.form.forkRebound = entry.forkRebound;
-  state.form.shockHigh = entry.shockHigh;
-  state.form.shockLow = entry.shockLow;
-  state.form.shockRebound = entry.shockRebound;
-  state.form.sag = entry.sag;
-  state.form.notes = entry.notes || "";
-
-  state.selectedTrack = entry.track || "Ohne Strecke";
-  syncDraft();
-  render();
-}
-
-function deleteSetup(entryId) {
-  state.setups = state.setups.filter((s) => s.id !== entryId);
-  saveState();
-  render();
-}
-
-function resetBike() {
-  const bike = state.form.bike;
-  state.form = createBikeDraft(bike);
-  state.selectedTrack = "__all__";
-  syncDraft();
-  render();
-}
-
-function bindField(id, key, parser = (v) => v) {
-  const el = document.getElementById(id);
-  el.addEventListener("input", (e) => {
-    state.form[key] = parser(e.target.value);
-    syncDraft();
-    render();
-  });
-  el.addEventListener("change", (e) => {
-    state.form[key] = parser(e.target.value);
-    syncDraft();
-    render();
-  });
+  state.bikes.forEach((bike) => ensureBikeExists(bike));
+  ensureBikeExists(state.selectedBike);
 }
 
 function setText(id, value) {
@@ -418,338 +124,547 @@ function setText(id, value) {
   if (el) el.textContent = value;
 }
 
+function updateSetupField(field, value) {
+  const key = ensureCurrentSetupExists();
+  if (!key) return;
+  state.setups[key][field] = value;
+  saveState();
+}
+
+function updateBikeConfig(field, value) {
+  if (!state.selectedBike) return;
+  ensureBikeExists(state.selectedBike);
+  state.bikeConfigs[state.selectedBike][field] = value;
+  saveState();
+}
+
+function collectSetupFromInputs() {
+  const config = getCurrentBikeConfig();
+
+  return {
+    forkPressure: clamp(document.getElementById("forkPressureNumber").value, 0, config.forkPressureMax),
+    forkRebound: clamp(document.getElementById("forkReboundNumber").value, 0, config.forkReboundMax),
+    shockPressure: clamp(document.getElementById("shockPressureNumber").value, 0, config.shockPressureMax),
+    shockHigh: document.getElementById("shockHighSelect").value,
+    shockLow: clamp(document.getElementById("shockLowNumber").value, 0, config.shockLowMax),
+    shockRebound: clamp(document.getElementById("shockReboundNumber").value, 0, config.shockReboundMax),
+    forkHeight: clamp(document.getElementById("forkHeightInput").value, 0, 30),
+    notes: document.getElementById("notesInput").value || "",
+  };
+}
+
 function renderBikeCards() {
-  const container = document.getElementById("bikeCards");
+  const container = document.getElementById("bikeList");
   container.innerHTML = "";
 
   state.bikes.forEach((bike) => {
-    const active = state.form.bike === bike;
     const card = document.createElement("button");
-    card.className = `bike-card${active ? " active" : ""}`;
     card.type = "button";
+    card.className = `bike-card${bike === state.selectedBike ? " active" : ""}`;
     card.innerHTML = `
       <div class="bike-card-top">
         <div class="bike-icon">🏍</div>
-        ${active ? '<span class="active-badge">Aktiv</span>' : ""}
+        ${bike === state.selectedBike ? '<span class="active-badge">Aktiv</span>' : ""}
       </div>
       <div class="bike-name">${bike}</div>
-      <div class="bike-sub">Setup laden und bearbeiten</div>
+      <div class="bike-sub">Bike auswählen</div>
     `;
-    card.addEventListener("click", () => switchBike(bike));
+    card.addEventListener("click", () => {
+      state.selectedBike = bike;
+      state.selectedTrack = "";
+      state.selectedCondition = "";
+      saveState();
+      renderAll();
+    });
     container.appendChild(card);
-  });
-
-  const customCard = document.createElement("button");
-  customCard.className = `bike-card${state.form.bike === "__custom__" ? " active" : ""}`;
-  customCard.type = "button";
-  customCard.innerHTML = `
-    <div class="bike-card-top">
-      <div class="bike-icon">＋</div>
-      ${state.form.bike === "__custom__" ? '<span class="active-badge">Aktiv</span>' : ""}
-    </div>
-    <div class="bike-name">Eigenes Bike</div>
-    <div class="bike-sub">Neues Motorrad anlegen</div>
-  `;
-  customCard.addEventListener("click", () => switchBike("__custom__"));
-  container.appendChild(customCard);
-}
-
-function renderSummary(analysis) {
-  const bikeName = resolvedBikeName() || "Kein Motorrad";
-  setText("sidebarActiveBike", bikeName);
-  setText("heroBikePill", bikeName);
-  setText("summaryBike", bikeName);
-  setText("activeBikeLabel", bikeName);
-
-  setText("summaryRange", `${analysis.surfaceLabel} · ${analysis.weatherLabel}`);
-  setText("summaryTrack", state.form.track || "–");
-  setText("summarySag", `${state.form.sag} mm`);
-  setText("summaryFork", `C ${state.form.forkCompression} · R ${state.form.forkRebound}`);
-  setText("summaryShock", `L ${state.form.shockLow} · R ${state.form.shockRebound}`);
-  setText("summaryHigh", state.form.shockHigh);
-
-  document.getElementById("deleteBikeBtn").style.display =
-    state.form.bike === "__custom__" ? "none" : "inline-flex";
-
-  document.getElementById("customBikeWrap").classList.toggle(
-    "hidden",
-    state.form.bike !== "__custom__"
-  );
-}
-
-function renderFields() {
-  document.getElementById("trackInput").value = state.form.track;
-  document.getElementById("surfaceSelect").value = state.form.surface;
-  document.getElementById("weatherSelect").value = state.form.weather;
-  document.getElementById("shockHighSelect").value = state.form.shockHigh;
-  document.getElementById("sagInput").value = state.form.sag;
-  document.getElementById("notesInput").value = state.form.notes;
-  document.getElementById("customBikeInput").value = state.form.bikeCustom;
-
-  document.getElementById("forkCompNumber").value = state.form.forkCompression;
-  document.getElementById("forkCompRange").value = state.form.forkCompression;
-  document.getElementById("forkRebNumber").value = state.form.forkRebound;
-  document.getElementById("forkRebRange").value = state.form.forkRebound;
-  document.getElementById("shockLowNumber").value = state.form.shockLow;
-  document.getElementById("shockLowRange").value = state.form.shockLow;
-  document.getElementById("shockRebNumber").value = state.form.shockRebound;
-  document.getElementById("shockRebRange").value = state.form.shockRebound;
-
-  setText("forkCompValue", state.form.forkCompression);
-  setText("forkCompBadge", state.form.forkCompression);
-  setText("forkRebValue", state.form.forkRebound);
-  setText("forkRebBadge", state.form.forkRebound);
-  setText("shockLowValue", state.form.shockLow);
-  setText("shockLowBadge", state.form.shockLow);
-  setText("shockRebValue", state.form.shockRebound);
-  setText("shockRebBadge", state.form.shockRebound);
-  setText("shockHighValue", state.form.shockHigh);
-
-  setText("forkOverview", `Comp ${state.form.forkCompression} · Reb ${state.form.forkRebound}`);
-  setText(
-    "shockOverview",
-    `Low ${state.form.shockLow} · Reb ${state.form.shockRebound} · High ${state.form.shockHigh}`
-  );
-}
-
-function renderAnalysis(analysis) {
-  const dot = document.getElementById("terrainDot");
-  dot.style.left = `${analysis.x}%`;
-  dot.style.top = `${analysis.y}%`;
-
-  setText("analysisSurface", analysis.surfaceLabel);
-  setText("analysisWeather", analysis.weatherLabel);
-  setText("analysisConfidence", `${analysis.confidence}%`);
-
-  const wrap = document.getElementById("analysisReasons");
-  wrap.innerHTML = "";
-
-  if (analysis.reasons.length === 0) {
-    const empty = document.createElement("span");
-    empty.className = "meta";
-    empty.textContent = "Aktuell eher neutrales Basis-Setup.";
-    wrap.appendChild(empty);
-    return;
-  }
-
-  analysis.reasons.forEach((reason) => {
-    const chip = document.createElement("span");
-    chip.className = "reason-chip";
-    chip.textContent = reason;
-    wrap.appendChild(chip);
   });
 }
 
 function renderTracks() {
-  const list = document.getElementById("tracksList");
-  list.innerHTML = "";
+  const container = document.getElementById("trackList");
+  container.innerHTML = "";
 
-  const tracks = groupedTracks();
+  if (!state.selectedBike) return;
 
-  if (tracks.length === 0) {
-    list.innerHTML = `<div class="empty-state">Für dieses Bike gibt es noch keine gespeicherten Strecken-Setups.</div>`;
+  const tracks = state.tracksByBike[state.selectedBike] || [];
+  if (!tracks.length) {
+    const empty = document.createElement("div");
+    empty.className = "track-card";
+    empty.textContent = "Noch keine Strecken vorhanden.";
+    empty.style.cursor = "default";
+    container.appendChild(empty);
     return;
   }
 
   tracks.forEach((track) => {
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = `track-item${state.selectedTrack === track.name ? " active" : ""}`;
-    item.innerHTML = `
-      <div class="track-item-row">
-        <div>
-          <div class="track-name">${track.name}</div>
-          <div class="meta">${track.count} gespeicherte Setups</div>
-        </div>
-        <div class="meta">${new Date(track.latest).toLocaleDateString("de-DE")}</div>
-      </div>
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = `track-card${track === state.selectedTrack ? " active" : ""}`;
+    card.innerHTML = `
+      <div class="track-name">${track}</div>
+      <div class="track-sub">Strecke auswählen</div>
     `;
-    item.addEventListener("click", () => {
-      state.selectedTrack = track.name;
-      render();
+    card.addEventListener("click", () => {
+      state.selectedTrack = track;
+      if (!state.selectedCondition) state.selectedCondition = "trocken";
+      ensureCurrentSetupExists();
+      saveState();
+      renderAll();
     });
-    list.appendChild(item);
+    container.appendChild(card);
   });
 }
 
-function renderSymptomGuide() {
-  const select = document.getElementById("symptomSelect");
-  if (!select.dataset.ready) {
-    Object.entries(SYMPTOM_GUIDE).forEach(([key, value]) => {
-      const option = document.createElement("option");
-      option.value = key;
-      option.textContent = value.label;
-      select.appendChild(option);
-    });
-    select.dataset.ready = "true";
+function renderConditions() {
+  const enabled = Boolean(state.selectedBike && state.selectedTrack);
+
+  document.querySelectorAll(".condition-btn").forEach((btn) => {
+    const condition = btn.dataset.condition;
+    btn.classList.toggle("active", condition === state.selectedCondition);
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? "1" : "0.45";
+    btn.style.pointerEvents = enabled ? "auto" : "none";
+  });
+}
+
+function renderSummary() {
+  const setup = getCurrentSetup();
+  const config = getCurrentBikeConfig();
+
+  const bike = state.selectedBike || "–";
+  const track = state.selectedTrack || "–";
+  const condition = state.selectedCondition || "–";
+
+  setText("sidebarStatus", `${bike} / ${track} / ${condition}`);
+  setText("heroPill", bike);
+  setText("summaryBike", bike);
+  setText("summaryTrack", track);
+  setText("summaryCondition", condition);
+
+  const context =
+    state.selectedBike && state.selectedTrack && state.selectedCondition
+      ? `${state.selectedBike} · ${state.selectedTrack} · ${state.selectedCondition}`
+      : "Bitte Bike, Strecke und Bedingung wählen";
+
+  setText("setupContext", context);
+  setText("forkOverview", `Druckstufe ${setup.forkPressure} · Zugstufe ${setup.forkRebound}`);
+
+  if (config.shockSeparate) {
+    setText(
+      "shockOverview",
+      `Low-Speed ${setup.shockLow} · Zugstufe ${setup.shockRebound} · High-Speed ${setup.shockHigh}`
+    );
+  } else {
+    setText(
+      "shockOverview",
+      `Druckstufe ${setup.shockPressure} · Zugstufe ${setup.shockRebound}`
+    );
+  }
+}
+
+function setSliderGroup(rangeId, numberId, valueId, badgeId, maxId, maxLabelId, value, max) {
+  const range = document.getElementById(rangeId);
+  const number = document.getElementById(numberId);
+  const maxInput = document.getElementById(maxId);
+
+  range.max = max;
+  number.max = max;
+  maxInput.value = max;
+
+  range.value = value;
+  number.value = value;
+
+  setText(valueId, value);
+  setText(badgeId, value);
+  setText(maxLabelId, max);
+}
+
+function renderSetup() {
+  const setup = getCurrentSetup();
+  const config = getCurrentBikeConfig();
+
+  setSliderGroup(
+    "forkPressureRange",
+    "forkPressureNumber",
+    "forkPressureValue",
+    "forkPressureBadge",
+    "forkPressureMax",
+    "forkPressureMaxLabel",
+    setup.forkPressure,
+    config.forkPressureMax
+  );
+
+  setSliderGroup(
+    "forkReboundRange",
+    "forkReboundNumber",
+    "forkReboundValue",
+    "forkReboundBadge",
+    "forkReboundMax",
+    "forkReboundMaxLabel",
+    setup.forkRebound,
+    config.forkReboundMax
+  );
+
+  document.getElementById("separateHighLow").checked = !!config.shockSeparate;
+
+  setSliderGroup(
+    "shockPressureRange",
+    "shockPressureNumber",
+    "shockPressureValue",
+    "shockPressureBadge",
+    "shockPressureMax",
+    "shockPressureMaxLabel",
+    setup.shockPressure,
+    config.shockPressureMax
+  );
+
+  setSliderGroup(
+    "shockLowRange",
+    "shockLowNumber",
+    "shockLowValue",
+    "shockLowBadge",
+    "shockLowMax",
+    "shockLowMaxLabel",
+    setup.shockLow,
+    config.shockLowMax
+  );
+
+  setSliderGroup(
+    "shockReboundRange",
+    "shockReboundNumber",
+    "shockReboundValue",
+    "shockReboundBadge",
+    "shockReboundMax",
+    "shockReboundMaxLabel",
+    setup.shockRebound,
+    config.shockReboundMax
+  );
+
+  document.getElementById("shockHighSelect").value = setup.shockHigh;
+  setText("shockHighValue", setup.shockHigh);
+
+  document.getElementById("forkHeightInput").value = setup.forkHeight;
+  document.getElementById("notesInput").value = setup.notes;
+
+  document.getElementById("shockSimpleBlock").classList.toggle("hidden", !!config.shockSeparate);
+  document.getElementById("shockSeparateBlock").classList.toggle("hidden", !config.shockSeparate);
+}
+
+function bindSlider(rangeId, numberId, valueId, badgeId, maxId, maxLabelId, setupField, configField) {
+  const range = document.getElementById(rangeId);
+  const number = document.getElementById(numberId);
+  const maxInput = document.getElementById(maxId);
+
+  function applyValue(rawValue) {
+    const max = clamp(maxInput.value, 1, 99);
+    const value = clamp(rawValue, 0, max);
+
+    maxInput.value = max;
+    range.max = max;
+    number.max = max;
+
+    range.value = value;
+    number.value = value;
+
+    setText(valueId, value);
+    setText(badgeId, value);
+    setText(maxLabelId, max);
+
+    updateBikeConfig(configField, max);
+    updateSetupField(setupField, value);
+    renderSummary();
   }
 
-  select.value = state.selectedSymptom;
+  range.addEventListener("input", () => applyValue(range.value));
+  number.addEventListener("input", () => applyValue(number.value));
 
-  const wrap = document.getElementById("symptomTips");
-  wrap.innerHTML = "";
+  maxInput.addEventListener("input", () => {
+    const max = clamp(maxInput.value, 1, 99);
+    const value = clamp(number.value, 0, max);
 
-  SYMPTOM_GUIDE[state.selectedSymptom].tips.forEach((tip) => {
-    const item = document.createElement("div");
-    item.className = "tip-item";
-    item.textContent = tip;
-    wrap.appendChild(item);
+    maxInput.value = max;
+    range.max = max;
+    number.max = max;
+
+    range.value = value;
+    number.value = value;
+
+    setText(valueId, value);
+    setText(badgeId, value);
+    setText(maxLabelId, max);
+
+    updateBikeConfig(configField, max);
+    updateSetupField(setupField, value);
+    renderSummary();
   });
-}
-
-function renderSetups() {
-  const list = document.getElementById("setupsList");
-  list.innerHTML = "";
-
-  const setups = currentVisibleSetups();
-
-  if (setups.length === 0) {
-    list.innerHTML = `<div class="empty-state">Keine Setups für diese Auswahl gespeichert.</div>`;
-    return;
-  }
-
-  setups.forEach((entry) => {
-    const item = document.createElement("div");
-    item.className = "setup-item";
-    item.innerHTML = `
-      <div class="setup-item-row">
-        <div>
-          <div class="setup-name">${entry.track || "Ohne Strecke"}</div>
-          <div class="meta">
-            ${new Date(entry.createdAt).toLocaleDateString("de-DE")} ·
-            ${entry.derivedSurface || "–"} · ${entry.derivedWeather || "–"}
-          </div>
-        </div>
-        <div class="row-actions">
-          <button class="btn btn-small btn-secondary" data-action="load">Laden</button>
-          <button class="btn btn-small btn-danger" data-action="delete">Löschen</button>
-        </div>
-      </div>
-      ${
-        entry.notes
-          ? `<div class="meta" style="margin-top:10px;">${entry.notes}</div>`
-          : ""
-      }
-    `;
-
-    item.querySelector('[data-action="load"]').addEventListener("click", () => loadSetup(entry.id));
-    item.querySelector('[data-action="delete"]').addEventListener("click", () => deleteSetup(entry.id));
-    list.appendChild(item);
-  });
-}
-
-function render() {
-  const analysis = getSetupAnalysis(state.form);
-  renderBikeCards();
-  renderSummary(analysis);
-  renderFields();
-  renderAnalysis(analysis);
-  renderTracks();
-  renderSymptomGuide();
-  renderSetups();
-  saveState();
 }
 
 function bindAccordion() {
   document.querySelectorAll(".accordion-toggle").forEach((btn) => {
     btn.addEventListener("click", () => {
-      btn.closest(".accordion").classList.toggle("open");
+      const target = document.getElementById(btn.dataset.target);
+      const arrow = btn.querySelector(".accordion-arrow");
+      const open = target.classList.contains("open-content");
+
+      target.classList.toggle("open-content", !open);
+      arrow.textContent = open ? "⌄" : "⌃";
     });
   });
 }
 
-function bindField(id, key, parser = (v) => v) {
-  const el = document.getElementById(id);
-  el.addEventListener("input", (e) => {
-    state.form[key] = parser(e.target.value);
-    syncDraft();
-    render();
+function bindMaxToggles() {
+  document.querySelectorAll(".max-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const wrap = document.getElementById(btn.dataset.target);
+      wrap.classList.toggle("hidden");
+    });
   });
-  el.addEventListener("change", (e) => {
-    state.form[key] = parser(e.target.value);
-    syncDraft();
-    render();
-  });
+}
+
+function exportJson() {
+  const data = {
+    bikes: state.bikes,
+    tracksByBike: state.tracksByBike,
+    bikeConfigs: state.bikeConfigs,
+    setups: state.setups,
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "suspension-tool-backup.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importJson(file) {
+  const reader = new FileReader();
+
+  reader.onload = (event) => {
+    try {
+      const data = JSON.parse(event.target.result);
+
+      if (Array.isArray(data.bikes)) state.bikes = data.bikes;
+      if (data.tracksByBike && typeof data.tracksByBike === "object") state.tracksByBike = data.tracksByBike;
+      if (data.bikeConfigs && typeof data.bikeConfigs === "object") state.bikeConfigs = data.bikeConfigs;
+      if (data.setups && typeof data.setups === "object") state.setups = data.setups;
+
+      if (!state.bikes.includes(state.selectedBike)) {
+        state.selectedBike = state.bikes[0] || "";
+        state.selectedTrack = "";
+        state.selectedCondition = "";
+      }
+
+      state.bikes.forEach((bike) => ensureBikeExists(bike));
+      saveState();
+      renderAll();
+    } catch (e) {
+      alert("JSON konnte nicht importiert werden.");
+      console.error(e);
+    }
+  };
+
+  reader.readAsText(file);
 }
 
 function bindEvents() {
-  document.getElementById("addBikeBtn").addEventListener("click", addBike);
-  document.getElementById("deleteBikeBtn").addEventListener("click", deleteBike);
-  document.getElementById("saveSetupBtn").addEventListener("click", saveSetup);
-  document.getElementById("resetBikeBtn").addEventListener("click", resetBike);
-  document.getElementById("allTracksBtn").addEventListener("click", () => {
-    state.selectedTrack = "__all__";
-    render();
+  document.getElementById("addBikeBtn").addEventListener("click", () => {
+    const input = document.getElementById("bikeInput");
+    const value = input.value.trim();
+    if (!value) return;
+
+    ensureBikeExists(value);
+    state.selectedBike = value;
+    state.selectedTrack = "";
+    state.selectedCondition = "";
+    input.value = "";
+    saveState();
+    renderAll();
   });
 
-  bindField("trackInput", "track", (v) => v);
-  bindField("surfaceSelect", "surface", (v) => v);
-  bindField("weatherSelect", "weather", (v) => v);
-  bindField("shockHighSelect", "shockHigh", (v) => v);
-  bindField("sagInput", "sag", (v) => clamp(v, 80, 130));
-  bindField("notesInput", "notes", (v) => v);
+  document.getElementById("deleteBikeBtn").addEventListener("click", () => {
+    if (!state.selectedBike) return;
 
-  document.getElementById("customBikeInput").addEventListener("input", (e) => {
-    state.form.bikeCustom = e.target.value;
-    syncDraft();
-    render();
+    const ok = window.confirm(`Bike "${state.selectedBike}" wirklich löschen?`);
+    if (!ok) return;
+
+    const bike = state.selectedBike;
+    state.bikes = state.bikes.filter((b) => b !== bike);
+    delete state.tracksByBike[bike];
+    delete state.bikeConfigs[bike];
+
+    Object.keys(state.setups).forEach((key) => {
+      if (key.startsWith(`${bike}__`)) delete state.setups[key];
+    });
+
+    state.selectedBike = state.bikes[0] || "";
+    state.selectedTrack = "";
+    state.selectedCondition = "";
+
+    if (state.selectedBike) ensureBikeExists(state.selectedBike);
+
+    saveState();
+    renderAll();
   });
 
-  [
-    ["forkCompNumber", "forkCompRange", "forkCompression"],
-    ["forkRebNumber", "forkRebRange", "forkRebound"],
-    ["shockLowNumber", "shockLowRange", "shockLow"],
-    ["shockRebNumber", "shockRebRange", "shockRebound"],
-  ].forEach(([numberId, rangeId, key]) => {
-    const numberEl = document.getElementById(numberId);
-    const rangeEl = document.getElementById(rangeId);
+  document.getElementById("addTrackBtn").addEventListener("click", () => {
+    if (!state.selectedBike) return;
 
-    const update = (value) => {
-      state.form[key] = clamp(value, 0, 22);
-      syncDraft();
-      render();
-    };
+    const input = document.getElementById("trackInput");
+    const value = input.value.trim();
+    if (!value) return;
 
-    numberEl.addEventListener("input", (e) => update(e.target.value));
-    rangeEl.addEventListener("input", (e) => update(e.target.value));
+    ensureBikeExists(state.selectedBike);
+
+    if (!state.tracksByBike[state.selectedBike].includes(value)) {
+      state.tracksByBike[state.selectedBike].push(value);
+    }
+
+    state.selectedTrack = value;
+    if (!state.selectedCondition) state.selectedCondition = "trocken";
+    ensureCurrentSetupExists();
+
+    input.value = "";
+    saveState();
+    renderAll();
   });
 
-  document.getElementById("symptomSelect").addEventListener("change", (e) => {
-    state.selectedSymptom = e.target.value;
-    render();
+  document.querySelectorAll(".condition-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.selectedCondition = btn.dataset.condition;
+      ensureCurrentSetupExists();
+      saveState();
+      renderAll();
+    });
   });
+
+  document.getElementById("saveSetupBtn").addEventListener("click", () => {
+    if (!state.selectedBike || !state.selectedTrack || !state.selectedCondition) {
+      alert("Bitte zuerst Bike, Strecke und Bedingung auswählen.");
+      return;
+    }
+    state.setups[currentSetupKey()] = collectSetupFromInputs();
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById("resetSetupBtn").addEventListener("click", () => {
+    if (!state.selectedBike || !state.selectedTrack || !state.selectedCondition) {
+      alert("Bitte zuerst Bike, Strecke und Bedingung auswählen.");
+      return;
+    }
+    state.setups[currentSetupKey()] = deepCopy(DEFAULT_SETUP);
+    saveState();
+    renderAll();
+  });
+
+  document.getElementById("separateHighLow").addEventListener("change", (e) => {
+    updateBikeConfig("shockSeparate", e.target.checked);
+    renderSetup();
+    renderSummary();
+  });
+
+  document.getElementById("shockHighSelect").addEventListener("change", (e) => {
+    updateSetupField("shockHigh", e.target.value);
+    setText("shockHighValue", e.target.value);
+    renderSummary();
+  });
+
+  document.getElementById("forkHeightInput").addEventListener("input", (e) => {
+    updateSetupField("forkHeight", clamp(e.target.value, 0, 30));
+  });
+
+  document.getElementById("notesInput").addEventListener("input", (e) => {
+    updateSetupField("notes", e.target.value);
+  });
+
+  document.getElementById("exportBtn").addEventListener("click", exportJson);
+  document.getElementById("importBtn").addEventListener("click", () => {
+    document.getElementById("fileInput").click();
+  });
+  document.getElementById("fileInput").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) importJson(file);
+  });
+
+  bindSlider(
+    "forkPressureRange",
+    "forkPressureNumber",
+    "forkPressureValue",
+    "forkPressureBadge",
+    "forkPressureMax",
+    "forkPressureMaxLabel",
+    "forkPressure",
+    "forkPressureMax"
+  );
+
+  bindSlider(
+    "forkReboundRange",
+    "forkReboundNumber",
+    "forkReboundValue",
+    "forkReboundBadge",
+    "forkReboundMax",
+    "forkReboundMaxLabel",
+    "forkRebound",
+    "forkReboundMax"
+  );
+
+  bindSlider(
+    "shockPressureRange",
+    "shockPressureNumber",
+    "shockPressureValue",
+    "shockPressureBadge",
+    "shockPressureMax",
+    "shockPressureMaxLabel",
+    "shockPressure",
+    "shockPressureMax"
+  );
+
+  bindSlider(
+    "shockLowRange",
+    "shockLowNumber",
+    "shockLowValue",
+    "shockLowBadge",
+    "shockLowMax",
+    "shockLowMaxLabel",
+    "shockLow",
+    "shockLowMax"
+  );
+
+  bindSlider(
+    "shockReboundRange",
+    "shockReboundNumber",
+    "shockReboundValue",
+    "shockReboundBadge",
+    "shockReboundMax",
+    "shockReboundMaxLabel",
+    "shockRebound",
+    "shockReboundMax"
+  );
 
   bindAccordion();
+  bindMaxToggles();
+}
+
+function renderAll() {
+  renderBikeCards();
+  renderTracks();
+  renderConditions();
+  renderSetup();
+  renderSummary();
+  saveState();
 }
 
 function runSanityChecks() {
-  console.assert(clamp(30, 0, 22) === 22, "clamp upper bound failed");
-  console.assert(clamp(-5, 0, 22) === 0, "clamp lower bound failed");
-  console.assert(getHighspeedNumeric("n.v.") === 1.5, "highspeed n.v. mapping failed");
-  console.assert(getHighspeedNumeric("3.5") === 3, "highspeed clamp max failed");
-  console.assert(getHighspeedNumeric("0") === 0.5, "highspeed clamp min failed");
-
-  const neutral = getSetupAnalysis(INITIAL_FORM);
-  console.assert(neutral.x >= 10 && neutral.x <= 90, "analysis x out of range");
-  console.assert(neutral.y >= 10 && neutral.y <= 90, "analysis y out of range");
-  console.assert(typeof neutral.surfaceLabel === "string", "surface label missing");
-  console.assert(typeof neutral.weatherLabel === "string", "weather label missing");
-
-  const stiff = getSetupAnalysis({
-    ...INITIAL_FORM,
-    forkCompression: 22,
-    forkRebound: 22,
-    shockLow: 22,
-    shockRebound: 22,
-    shockHigh: "3.0",
-    sag: 90,
-  });
-  console.assert(stiff.x >= neutral.x, "stiff setup should not move left of neutral unexpectedly");
+  console.assert(clamp(30, 0, 22) === 22, "Clamp oben fehlerhaft");
+  console.assert(clamp(-5, 0, 22) === 0, "Clamp unten fehlerhaft");
+  console.assert(DEFAULT_BIKE_CONFIG.forkPressureMax === 22, "Default Bike Config fehlerhaft");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   runSanityChecks();
   loadState();
   bindEvents();
-  render();
+  renderAll();
 });
