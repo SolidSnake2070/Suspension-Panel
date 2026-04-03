@@ -1,670 +1,987 @@
-const STORAGE_KEY = "mx-suspension-clean-v1";
-const GARAGE_URL = "https://solidsnake2070.github.io/Garage-Tool/";
+const STORAGE_KEY = "suspensionToolDataV2";
 
-const DEFAULT_BIKES = ["KX250F", "KX85", "KTM 65 SX", "SX-F 250"];
-const CONDITIONS = ["trocken", "nass", "feucht"];
-
-const DEFAULT_BIKE_CONFIG = {
-  forkPressureMax: 22,
-  forkReboundMax: 22,
-  shockSeparate: false,
-  shockPressureMax: 22,
-  shockLowMax: 22,
-  shockReboundMax: 22,
+const BRAND_THEMES = {
+  ktm: {
+    name: "KTM",
+    accent: "#f97316",
+    soft: "rgba(249, 115, 22, 0.14)",
+    border: "rgba(249, 115, 22, 0.55)",
+    borderStrong: "rgba(249, 115, 22, 0.92)",
+    text: "#ffedd5",
+    glow: "rgba(249, 115, 22, 0.18)"
+  },
+  kawasaki: {
+    name: "Kawasaki",
+    accent: "#22c55e",
+    soft: "rgba(34, 197, 94, 0.14)",
+    border: "rgba(34, 197, 94, 0.55)",
+    borderStrong: "rgba(34, 197, 94, 0.92)",
+    text: "#dcfce7",
+    glow: "rgba(34, 197, 94, 0.18)"
+  },
+  yamaha: {
+    name: "Yamaha",
+    accent: "#2563eb",
+    soft: "rgba(37, 99, 235, 0.14)",
+    border: "rgba(37, 99, 235, 0.55)",
+    borderStrong: "rgba(37, 99, 235, 0.92)",
+    text: "#dbeafe",
+    glow: "rgba(37, 99, 235, 0.18)"
+  },
+  suzuki: {
+    name: "Suzuki",
+    accent: "#eab308",
+    soft: "rgba(234, 179, 8, 0.14)",
+    border: "rgba(234, 179, 8, 0.55)",
+    borderStrong: "rgba(234, 179, 8, 0.92)",
+    text: "#fef9c3",
+    glow: "rgba(234, 179, 8, 0.18)"
+  },
+  honda: {
+    name: "Honda",
+    accent: "#ef4444",
+    soft: "rgba(239, 68, 68, 0.14)",
+    border: "rgba(239, 68, 68, 0.55)",
+    borderStrong: "rgba(239, 68, 68, 0.92)",
+    text: "#fee2e2",
+    glow: "rgba(239, 68, 68, 0.18)"
+  },
+  gasgas: {
+    name: "GASGAS",
+    accent: "#dc2626",
+    soft: "rgba(220, 38, 38, 0.14)",
+    border: "rgba(220, 38, 38, 0.55)",
+    borderStrong: "rgba(220, 38, 38, 0.92)",
+    text: "#fee2e2",
+    glow: "rgba(220, 38, 38, 0.18)"
+  },
+  husqvarna: {
+    name: "Husqvarna",
+    accent: "#60a5fa",
+    soft: "rgba(96, 165, 250, 0.14)",
+    border: "rgba(96, 165, 250, 0.55)",
+    borderStrong: "rgba(96, 165, 250, 0.92)",
+    text: "#e0f2fe",
+    glow: "rgba(96, 165, 250, 0.18)"
+  },
+  default: {
+    name: "Standard",
+    accent: "#0ea5e9",
+    soft: "rgba(14, 165, 233, 0.14)",
+    border: "rgba(14, 165, 233, 0.55)",
+    borderStrong: "rgba(56, 189, 248, 0.92)",
+    text: "#dff4ff",
+    glow: "rgba(14, 165, 233, 0.18)"
+  }
 };
 
 const DEFAULT_SETUP = {
   forkPressure: 12,
+  forkPressureMax: 22,
   forkRebound: 12,
+  forkReboundMax: 22,
+
+  separateHighLow: false,
+
   shockPressure: 12,
+  shockPressureMax: 22,
+
   shockHigh: "1.5",
+
   shockLow: 12,
+  shockLowMax: 22,
+
   shockRebound: 12,
+  shockReboundMax: 22,
+
   forkHeight: 0,
-  notes: "",
+  notes: ""
 };
 
-const state = {
-  bikes: [...DEFAULT_BIKES],
-  tracksByBike: {},
-  bikeConfigs: {},
-  selectedBike: DEFAULT_BIKES[0],
-  selectedTrack: "",
-  selectedCondition: "",
-  setups: {},
+const state = createInitialState();
+
+const el = {
+  bikeList: document.getElementById("bikeList"),
+  trackList: document.getElementById("trackList"),
+  bikeInput: document.getElementById("bikeInput"),
+  trackInput: document.getElementById("trackInput"),
+  addBikeBtn: document.getElementById("addBikeBtn"),
+  deleteBikeBtn: document.getElementById("deleteBikeBtn"),
+  addTrackBtn: document.getElementById("addTrackBtn"),
+  saveSetupBtn: document.getElementById("saveSetupBtn"),
+  resetSetupBtn: document.getElementById("resetSetupBtn"),
+  exportBtn: document.getElementById("exportBtn"),
+  importBtn: document.getElementById("importBtn"),
+  fileInput: document.getElementById("fileInput"),
+
+  heroPill: document.getElementById("heroPill"),
+  sidebarStatus: document.getElementById("sidebarStatus"),
+  setupContext: document.getElementById("setupContext"),
+  summaryBike: document.getElementById("summaryBike"),
+  summaryTrack: document.getElementById("summaryTrack"),
+  summaryCondition: document.getElementById("summaryCondition"),
+
+  forkOverview: document.getElementById("forkOverview"),
+  shockOverview: document.getElementById("shockOverview"),
+
+  separateHighLow: document.getElementById("separateHighLow"),
+  shockSimpleBlock: document.getElementById("shockSimpleBlock"),
+  shockSeparateBlock: document.getElementById("shockSeparateBlock"),
+  shockHighSelect: document.getElementById("shockHighSelect"),
+  shockHighValue: document.getElementById("shockHighValue"),
+
+  forkHeightInput: document.getElementById("forkHeightInput"),
+  notesInput: document.getElementById("notesInput")
 };
 
-function deepCopy(obj) {
-  return JSON.parse(JSON.stringify(obj));
+const sliderControllers = {
+  forkPressure: createSliderController({
+    range: "forkPressureRange",
+    number: "forkPressureNumber",
+    value: "forkPressureValue",
+    badge: "forkPressureBadge",
+    maxInput: "forkPressureMax",
+    maxLabel: "forkPressureMaxLabel"
+  }),
+  forkRebound: createSliderController({
+    range: "forkReboundRange",
+    number: "forkReboundNumber",
+    value: "forkReboundValue",
+    badge: "forkReboundBadge",
+    maxInput: "forkReboundMax",
+    maxLabel: "forkReboundMaxLabel"
+  }),
+  shockPressure: createSliderController({
+    range: "shockPressureRange",
+    number: "shockPressureNumber",
+    value: "shockPressureValue",
+    badge: "shockPressureBadge",
+    maxInput: "shockPressureMax",
+    maxLabel: "shockPressureMaxLabel"
+  }),
+  shockLow: createSliderController({
+    range: "shockLowRange",
+    number: "shockLowNumber",
+    value: "shockLowValue",
+    badge: "shockLowBadge",
+    maxInput: "shockLowMax",
+    maxLabel: "shockLowMaxLabel"
+  }),
+  shockRebound: createSliderController({
+    range: "shockReboundRange",
+    number: "shockReboundNumber",
+    value: "shockReboundValue",
+    badge: "shockReboundBadge",
+    maxInput: "shockReboundMax",
+    maxLabel: "shockReboundMaxLabel"
+  })
+};
+
+init();
+
+function init() {
+  bindEvents();
+  loadState();
+  applyBrandTheme(state.selectedBike);
+  renderAll();
+  loadSetupIntoForm();
+  updateShockModeUI();
+  updateOverviews();
+  updateAccordionArrows();
 }
 
-function clamp(value, min, max) {
-  const n = Number(value);
-  if (Number.isNaN(n)) return min;
-  return Math.min(max, Math.max(min, n));
-}
+function bindEvents() {
+  el.addBikeBtn.addEventListener("click", handleAddBike);
+  el.deleteBikeBtn.addEventListener("click", handleDeleteBike);
+  el.addTrackBtn.addEventListener("click", handleAddTrack);
+  el.saveSetupBtn.addEventListener("click", handleSaveSetup);
+  el.resetSetupBtn.addEventListener("click", handleResetSetup);
 
-function getSetupKey(bike, track, condition) {
-  return `${bike}__${track}__${condition}`;
-}
+  el.exportBtn.addEventListener("click", handleExport);
+  el.importBtn.addEventListener("click", () => el.fileInput.click());
+  el.fileInput.addEventListener("change", handleImport);
 
-function ensureBikeExists(bike) {
-  if (!bike) return;
-  if (!state.tracksByBike[bike]) state.tracksByBike[bike] = [];
-  if (!state.bikeConfigs[bike]) state.bikeConfigs[bike] = deepCopy(DEFAULT_BIKE_CONFIG);
-  if (!state.bikes.includes(bike)) state.bikes.push(bike);
-}
+  el.bikeInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      handleAddBike();
+    }
+  });
 
-function currentSetupKey() {
-  if (!state.selectedBike || !state.selectedTrack || !state.selectedCondition) return null;
-  return getSetupKey(state.selectedBike, state.selectedTrack, state.selectedCondition);
-}
+  el.trackInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      handleAddTrack();
+    }
+  });
 
-function ensureCurrentSetupExists() {
-  const key = currentSetupKey();
-  if (!key) return null;
-  if (!state.setups[key]) state.setups[key] = deepCopy(DEFAULT_SETUP);
-  return key;
-}
-
-function getCurrentSetup() {
-  const key = ensureCurrentSetupExists();
-  if (!key) return deepCopy(DEFAULT_SETUP);
-  return state.setups[key];
-}
-
-function getCurrentBikeConfig() {
-  if (!state.selectedBike) return deepCopy(DEFAULT_BIKE_CONFIG);
-  ensureBikeExists(state.selectedBike);
-  return state.bikeConfigs[state.selectedBike];
-}
-
-function saveState() {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      bikes: state.bikes,
-      tracksByBike: state.tracksByBike,
-      bikeConfigs: state.bikeConfigs,
-      selectedBike: state.selectedBike,
-      selectedTrack: state.selectedTrack,
-      selectedCondition: state.selectedCondition,
-      setups: state.setups,
-    })
-  );
-}
-
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    ensureBikeExists(state.selectedBike);
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-
-    if (Array.isArray(parsed.bikes) && parsed.bikes.length) state.bikes = parsed.bikes;
-    if (parsed.tracksByBike && typeof parsed.tracksByBike === "object") state.tracksByBike = parsed.tracksByBike;
-    if (parsed.bikeConfigs && typeof parsed.bikeConfigs === "object") state.bikeConfigs = parsed.bikeConfigs;
-    if (typeof parsed.selectedBike === "string") state.selectedBike = parsed.selectedBike;
-    if (typeof parsed.selectedTrack === "string") state.selectedTrack = parsed.selectedTrack;
-    if (typeof parsed.selectedCondition === "string") state.selectedCondition = parsed.selectedCondition;
-    if (parsed.setups && typeof parsed.setups === "object") state.setups = parsed.setups;
-  } catch (e) {
-    console.warn("Fehler beim Laden", e);
-  }
-
-  state.bikes.forEach((bike) => ensureBikeExists(bike));
-  ensureBikeExists(state.selectedBike);
-}
-
-function setText(id, value) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = value;
-}
-
-function updateSetupField(field, value) {
-  const key = ensureCurrentSetupExists();
-  if (!key) return;
-  state.setups[key][field] = value;
-  saveState();
-}
-
-function updateBikeConfig(field, value) {
-  if (!state.selectedBike) return;
-  ensureBikeExists(state.selectedBike);
-  state.bikeConfigs[state.selectedBike][field] = value;
-  saveState();
-}
-
-function collectSetupFromInputs() {
-  const config = getCurrentBikeConfig();
-
-  return {
-    forkPressure: clamp(document.getElementById("forkPressureNumber").value, 0, config.forkPressureMax),
-    forkRebound: clamp(document.getElementById("forkReboundNumber").value, 0, config.forkReboundMax),
-    shockPressure: clamp(document.getElementById("shockPressureNumber").value, 0, config.shockPressureMax),
-    shockHigh: document.getElementById("shockHighSelect").value,
-    shockLow: clamp(document.getElementById("shockLowNumber").value, 0, config.shockLowMax),
-    shockRebound: clamp(document.getElementById("shockReboundNumber").value, 0, config.shockReboundMax),
-    forkHeight: clamp(document.getElementById("forkHeightInput").value, 0, 30),
-    notes: document.getElementById("notesInput").value || "",
-  };
-}
-
-function renderBikeCards() {
-  const container = document.getElementById("bikeList");
-  container.innerHTML = "";
-
-  state.bikes.forEach((bike) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = `bike-card${bike === state.selectedBike ? " active" : ""}`;
-    card.innerHTML = `
-      <div class="bike-card-top">
-        <div class="bike-icon">🏍</div>
-        ${bike === state.selectedBike ? '<span class="active-badge">Aktiv</span>' : ""}
-      </div>
-      <div class="bike-name">${bike}</div>
-      <div class="bike-sub">Bike auswählen</div>
-    `;
-    card.addEventListener("click", () => {
-      state.selectedBike = bike;
-      state.selectedTrack = "";
-      state.selectedCondition = "";
-      saveState();
+  document.querySelectorAll(".condition-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedCondition = button.dataset.condition;
+      persistState();
       renderAll();
-    });
-    container.appendChild(card);
-  });
-}
-
-function renderTracks() {
-  const container = document.getElementById("trackList");
-  container.innerHTML = "";
-
-  if (!state.selectedBike) return;
-
-  const tracks = state.tracksByBike[state.selectedBike] || [];
-  if (!tracks.length) {
-    const empty = document.createElement("div");
-    empty.className = "track-card";
-    empty.textContent = "Noch keine Strecken vorhanden.";
-    empty.style.cursor = "default";
-    container.appendChild(empty);
-    return;
-  }
-
-  tracks.forEach((track) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = `track-card${track === state.selectedTrack ? " active" : ""}`;
-    card.innerHTML = `
-      <div class="track-name">${track}</div>
-      <div class="track-sub">Strecke auswählen</div>
-    `;
-    card.addEventListener("click", () => {
-      state.selectedTrack = track;
-      if (!state.selectedCondition) state.selectedCondition = "trocken";
-      ensureCurrentSetupExists();
-      saveState();
-      renderAll();
-    });
-    container.appendChild(card);
-  });
-}
-
-function renderConditions() {
-  const enabled = Boolean(state.selectedBike && state.selectedTrack);
-
-  document.querySelectorAll(".condition-btn").forEach((btn) => {
-    const condition = btn.dataset.condition;
-    btn.classList.toggle("active", condition === state.selectedCondition);
-    btn.disabled = !enabled;
-    btn.style.opacity = enabled ? "1" : "0.45";
-    btn.style.pointerEvents = enabled ? "auto" : "none";
-  });
-}
-
-function renderSummary() {
-  const setup = getCurrentSetup();
-  const config = getCurrentBikeConfig();
-
-  const bike = state.selectedBike || "–";
-  const track = state.selectedTrack || "–";
-  const condition = state.selectedCondition || "–";
-
-  setText("sidebarStatus", `${bike} / ${track} / ${condition}`);
-  setText("heroPill", bike);
-  setText("summaryBike", bike);
-  setText("summaryTrack", track);
-  setText("summaryCondition", condition);
-
-  const context =
-    state.selectedBike && state.selectedTrack && state.selectedCondition
-      ? `${state.selectedBike} · ${state.selectedTrack} · ${state.selectedCondition}`
-      : "Bitte Bike, Strecke und Bedingung wählen";
-
-  setText("setupContext", context);
-  setText("forkOverview", `Druckstufe ${setup.forkPressure} · Zugstufe ${setup.forkRebound}`);
-
-  if (config.shockSeparate) {
-    setText(
-      "shockOverview",
-      `Low-Speed ${setup.shockLow} · Zugstufe ${setup.shockRebound} · High-Speed ${setup.shockHigh}`
-    );
-  } else {
-    setText(
-      "shockOverview",
-      `Druckstufe ${setup.shockPressure} · Zugstufe ${setup.shockRebound}`
-    );
-  }
-}
-
-function setSliderGroup(rangeId, numberId, valueId, badgeId, maxId, maxLabelId, value, max) {
-  const range = document.getElementById(rangeId);
-  const number = document.getElementById(numberId);
-  const maxInput = document.getElementById(maxId);
-
-  range.max = max;
-  number.max = max;
-  maxInput.value = max;
-
-  range.value = value;
-  number.value = value;
-
-  setText(valueId, value);
-  setText(badgeId, value);
-  setText(maxLabelId, max);
-}
-
-function renderSetup() {
-  const setup = getCurrentSetup();
-  const config = getCurrentBikeConfig();
-
-  setSliderGroup(
-    "forkPressureRange",
-    "forkPressureNumber",
-    "forkPressureValue",
-    "forkPressureBadge",
-    "forkPressureMax",
-    "forkPressureMaxLabel",
-    setup.forkPressure,
-    config.forkPressureMax
-  );
-
-  setSliderGroup(
-    "forkReboundRange",
-    "forkReboundNumber",
-    "forkReboundValue",
-    "forkReboundBadge",
-    "forkReboundMax",
-    "forkReboundMaxLabel",
-    setup.forkRebound,
-    config.forkReboundMax
-  );
-
-  document.getElementById("separateHighLow").checked = !!config.shockSeparate;
-
-  setSliderGroup(
-    "shockPressureRange",
-    "shockPressureNumber",
-    "shockPressureValue",
-    "shockPressureBadge",
-    "shockPressureMax",
-    "shockPressureMaxLabel",
-    setup.shockPressure,
-    config.shockPressureMax
-  );
-
-  setSliderGroup(
-    "shockLowRange",
-    "shockLowNumber",
-    "shockLowValue",
-    "shockLowBadge",
-    "shockLowMax",
-    "shockLowMaxLabel",
-    setup.shockLow,
-    config.shockLowMax
-  );
-
-  setSliderGroup(
-    "shockReboundRange",
-    "shockReboundNumber",
-    "shockReboundValue",
-    "shockReboundBadge",
-    "shockReboundMax",
-    "shockReboundMaxLabel",
-    setup.shockRebound,
-    config.shockReboundMax
-  );
-
-  document.getElementById("shockHighSelect").value = setup.shockHigh;
-  setText("shockHighValue", setup.shockHigh);
-
-  document.getElementById("forkHeightInput").value = setup.forkHeight;
-  document.getElementById("notesInput").value = setup.notes;
-
-  document.getElementById("shockSimpleBlock").classList.toggle("hidden", !!config.shockSeparate);
-  document.getElementById("shockSeparateBlock").classList.toggle("hidden", !config.shockSeparate);
-}
-
-function bindSlider(rangeId, numberId, valueId, badgeId, maxId, maxLabelId, setupField, configField) {
-  const range = document.getElementById(rangeId);
-  const number = document.getElementById(numberId);
-  const maxInput = document.getElementById(maxId);
-
-  function applyValue(rawValue) {
-    const max = clamp(maxInput.value, 1, 99);
-    const value = clamp(rawValue, 0, max);
-
-    maxInput.value = max;
-    range.max = max;
-    number.max = max;
-
-    range.value = value;
-    number.value = value;
-
-    setText(valueId, value);
-    setText(badgeId, value);
-    setText(maxLabelId, max);
-
-    updateBikeConfig(configField, max);
-    updateSetupField(setupField, value);
-    renderSummary();
-  }
-
-  range.addEventListener("input", () => applyValue(range.value));
-  number.addEventListener("input", () => applyValue(number.value));
-
-  maxInput.addEventListener("input", () => {
-    const max = clamp(maxInput.value, 1, 99);
-    const value = clamp(number.value, 0, max);
-
-    maxInput.value = max;
-    range.max = max;
-    number.max = max;
-
-    range.value = value;
-    number.value = value;
-
-    setText(valueId, value);
-    setText(badgeId, value);
-    setText(maxLabelId, max);
-
-    updateBikeConfig(configField, max);
-    updateSetupField(setupField, value);
-    renderSummary();
-  });
-}
-
-function bindAccordion() {
-  document.querySelectorAll(".accordion-toggle").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const target = document.getElementById(btn.dataset.target);
-      const arrow = btn.querySelector(".accordion-arrow");
-      const open = target.classList.contains("open-content");
-
-      target.classList.toggle("open-content", !open);
-      arrow.textContent = open ? "⌄" : "⌃";
+      loadSetupIntoForm();
     });
   });
-}
 
-function bindMaxToggles() {
-  document.querySelectorAll(".max-toggle").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const wrap = document.getElementById(btn.dataset.target);
+  document.querySelectorAll(".accordion-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = document.getElementById(button.dataset.target);
+      if (!target) return;
+      target.classList.toggle("open-content");
+      updateAccordionArrows();
+    });
+  });
+
+  document.querySelectorAll(".max-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const wrap = document.getElementById(button.dataset.target);
+      if (!wrap) return;
       wrap.classList.toggle("hidden");
     });
   });
+
+  el.separateHighLow.addEventListener("change", () => {
+    updateShockModeUI();
+    updateOverviews();
+  });
+
+  el.shockHighSelect.addEventListener("change", () => {
+    el.shockHighValue.textContent = el.shockHighSelect.value;
+    updateOverviews();
+  });
+
+  el.forkHeightInput.addEventListener("input", updateOverviews);
+  el.notesInput.addEventListener("input", updateOverviews);
+
+  Object.values(sliderControllers).forEach((controller) => {
+    controller.onChange(updateOverviews);
+  });
 }
 
-function exportJson() {
-  const data = {
-    bikes: state.bikes,
-    tracksByBike: state.tracksByBike,
-    bikeConfigs: state.bikeConfigs,
-    setups: state.setups,
+function createInitialState() {
+  return {
+    selectedBike: "",
+    selectedTrack: "",
+    selectedCondition: "",
+    data: {
+      bikes: {}
+    }
+  };
+}
+
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function createSliderController(ids) {
+  const range = document.getElementById(ids.range);
+  const number = document.getElementById(ids.number);
+  const value = document.getElementById(ids.value);
+  const badge = document.getElementById(ids.badge);
+  const maxInput = document.getElementById(ids.maxInput);
+  const maxLabel = document.getElementById(ids.maxLabel);
+
+  const changeCallbacks = [];
+
+  const api = {
+    set(newValue, newMax) {
+      if (Number.isFinite(Number(newMax))) {
+        const safeMax = clamp(Math.round(Number(newMax)), 1, 99);
+        range.max = String(safeMax);
+        number.max = String(safeMax);
+        maxInput.value = String(safeMax);
+        maxLabel.textContent = String(safeMax);
+      }
+
+      const currentMax = Number(range.max);
+      const safeValue = clamp(Math.round(Number(newValue)), 0, currentMax);
+      range.value = String(safeValue);
+      number.value = String(safeValue);
+      value.textContent = String(safeValue);
+      badge.textContent = String(safeValue);
+    },
+    getValue() {
+      return Number(range.value);
+    },
+    getMax() {
+      return Number(range.max);
+    },
+    onChange(callback) {
+      changeCallbacks.push(callback);
+    }
   };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  function emitChange() {
+    changeCallbacks.forEach((callback) => callback());
+  }
+
+  function syncValue(nextValue) {
+    const currentMax = Number(range.max);
+    const safeValue = clamp(Math.round(Number(nextValue)), 0, currentMax);
+    range.value = String(safeValue);
+    number.value = String(safeValue);
+    value.textContent = String(safeValue);
+    badge.textContent = String(safeValue);
+    emitChange();
+  }
+
+  function syncMax(nextMax) {
+    const safeMax = clamp(Math.round(Number(nextMax)), 1, 99);
+    range.max = String(safeMax);
+    number.max = String(safeMax);
+    maxInput.value = String(safeMax);
+    maxLabel.textContent = String(safeMax);
+
+    if (Number(range.value) > safeMax) {
+      syncValue(safeMax);
+      return;
+    }
+
+    emitChange();
+  }
+
+  range.addEventListener("input", () => syncValue(range.value));
+  number.addEventListener("input", () => syncValue(number.value));
+  maxInput.addEventListener("input", () => syncMax(maxInput.value));
+
+  api.set(range.value, maxInput.value);
+  return api;
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function detectBrand(bikeName = "") {
+  const name = bikeName.toLowerCase().trim();
+
+  if (
+    name.includes("ktm") ||
+    name.includes("sx") ||
+    name.includes("exc") ||
+    name.includes("smc")
+  ) {
+    return "ktm";
+  }
+
+  if (
+    name.includes("kawasaki") ||
+    name.includes("kxf") ||
+    name.includes("kx-f") ||
+    name.includes("kx") ||
+    name.includes("klx")
+  ) {
+    return "kawasaki";
+  }
+
+  if (
+    name.includes("yamaha") ||
+    name.includes("yzf") ||
+    name.includes("yz") ||
+    name.includes("wr")
+  ) {
+    return "yamaha";
+  }
+
+  if (
+    name.includes("suzuki") ||
+    name.includes("rm-z") ||
+    name.includes("rmz") ||
+    name.includes("rm")
+  ) {
+    return "suzuki";
+  }
+
+  if (
+    name.includes("honda") ||
+    name.includes("crf") ||
+    name.includes("cr ")
+  ) {
+    return "honda";
+  }
+
+  if (
+    name.includes("gasgas") ||
+    name.includes("gas gas") ||
+    name.includes("mc ")
+  ) {
+    return "gasgas";
+  }
+
+  if (
+    name.includes("husqvarna") ||
+    name.includes("husky") ||
+    name.includes("fc ") ||
+    name.includes("tc ")
+  ) {
+    return "husqvarna";
+  }
+
+  return "default";
+}
+
+function getBrandTheme(bikeName = "") {
+  return BRAND_THEMES[detectBrand(bikeName)] || BRAND_THEMES.default;
+}
+
+function applyBrandTheme(bikeName = "") {
+  const theme = getBrandTheme(bikeName);
+  const root = document.documentElement;
+
+  root.style.setProperty("--accent", theme.accent);
+  root.style.setProperty("--accent-soft", theme.soft);
+  root.style.setProperty("--accent-border", theme.border);
+  root.style.setProperty("--accent-border-strong", theme.borderStrong);
+  root.style.setProperty("--accent-text", theme.text);
+  root.style.setProperty("--accent-glow", theme.glow);
+}
+
+function handleAddBike() {
+  const bikeName = el.bikeInput.value.trim();
+  if (!bikeName) return;
+
+  if (!state.data.bikes[bikeName]) {
+    state.data.bikes[bikeName] = { tracks: {} };
+  }
+
+  state.selectedBike = bikeName;
+  state.selectedTrack = "";
+  el.bikeInput.value = "";
+
+  applyBrandTheme(bikeName);
+  persistState();
+  renderAll();
+  loadSetupIntoForm();
+}
+
+function handleDeleteBike() {
+  if (!state.selectedBike) {
+    alert("Bitte zuerst ein Bike auswählen.");
+    return;
+  }
+
+  const bikeName = state.selectedBike;
+  const confirmed = confirm(`Bike "${bikeName}" wirklich löschen?`);
+  if (!confirmed) return;
+
+  delete state.data.bikes[bikeName];
+
+  const bikeNames = getBikeNames();
+  state.selectedBike = bikeNames[0] || "";
+  state.selectedTrack = "";
+  state.selectedCondition = state.selectedCondition || "";
+
+  applyBrandTheme(state.selectedBike);
+  persistState();
+  renderAll();
+  loadSetupIntoForm();
+}
+
+function handleAddTrack() {
+  if (!state.selectedBike) {
+    alert("Bitte zuerst ein Bike auswählen.");
+    return;
+  }
+
+  const trackName = el.trackInput.value.trim();
+  if (!trackName) return;
+
+  ensureBike(state.selectedBike);
+  ensureTrack(state.selectedBike, trackName);
+
+  state.selectedTrack = trackName;
+  el.trackInput.value = "";
+
+  persistState();
+  renderAll();
+  loadSetupIntoForm();
+}
+
+function handleSaveSetup() {
+  if (!isContextReady()) {
+    alert("Bitte Bike, Strecke und Bedingung wählen.");
+    return;
+  }
+
+  ensureBike(state.selectedBike);
+  ensureTrack(state.selectedBike, state.selectedTrack);
+
+  state.data.bikes[state.selectedBike].tracks[state.selectedTrack].conditions[state.selectedCondition] = readForm();
+
+  persistState();
+  renderAll();
+}
+
+function handleResetSetup() {
+  if (isContextReady()) {
+    const saved = getCurrentSetup();
+    if (saved) {
+      setForm(saved);
+      return;
+    }
+  }
+
+  setForm(clone(DEFAULT_SETUP));
+}
+
+function handleExport() {
+  const payload = {
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    appState: state
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json"
+  });
+
   const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "suspension-tool-backup.json";
-  a.click();
+  const anchor = document.createElement("a");
+  const date = new Date().toISOString().slice(0, 10);
+
+  anchor.href = url;
+  anchor.download = `suspension-tool-${date}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
   URL.revokeObjectURL(url);
 }
 
-function importJson(file) {
+function handleImport(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
   const reader = new FileReader();
 
-  reader.onload = (event) => {
+  reader.onload = () => {
     try {
-      const data = JSON.parse(event.target.result);
+      const parsed = JSON.parse(String(reader.result || "{}"));
+      const importedState = normalizeImportedState(parsed);
 
-      if (Array.isArray(data.bikes)) state.bikes = data.bikes;
-      if (data.tracksByBike && typeof data.tracksByBike === "object") state.tracksByBike = data.tracksByBike;
-      if (data.bikeConfigs && typeof data.bikeConfigs === "object") state.bikeConfigs = data.bikeConfigs;
-      if (data.setups && typeof data.setups === "object") state.setups = data.setups;
+      state.selectedBike = importedState.selectedBike;
+      state.selectedTrack = importedState.selectedTrack;
+      state.selectedCondition = importedState.selectedCondition;
+      state.data = importedState.data;
 
-      if (!state.bikes.includes(state.selectedBike)) {
-        state.selectedBike = state.bikes[0] || "";
-        state.selectedTrack = "";
-        state.selectedCondition = "";
-      }
-
-      state.bikes.forEach((bike) => ensureBikeExists(bike));
-      saveState();
+      normalizeSelections();
+      applyBrandTheme(state.selectedBike);
+      persistState();
       renderAll();
-    } catch (e) {
-      alert("JSON konnte nicht importiert werden.");
-      console.error(e);
+      loadSetupIntoForm();
+      alert("Import erfolgreich.");
+    } catch (error) {
+      console.error(error);
+      alert("Import fehlgeschlagen. Bitte eine gültige JSON-Datei verwenden.");
+    } finally {
+      el.fileInput.value = "";
     }
   };
 
   reader.readAsText(file);
 }
 
-function bindEvents() {
-  document.getElementById("addBikeBtn").addEventListener("click", () => {
-    const input = document.getElementById("bikeInput");
-    const value = input.value.trim();
-    if (!value) return;
+function normalizeImportedState(parsed) {
+  const candidate = parsed?.appState ?? parsed;
+  const fresh = createInitialState();
 
-    ensureBikeExists(value);
-    state.selectedBike = value;
-    state.selectedTrack = "";
-    state.selectedCondition = "";
-    input.value = "";
-    saveState();
-    renderAll();
-  });
-
-  document.getElementById("deleteBikeBtn").addEventListener("click", () => {
-    if (!state.selectedBike) return;
-
-    const ok = window.confirm(`Bike "${state.selectedBike}" wirklich löschen?`);
-    if (!ok) return;
-
-    const bike = state.selectedBike;
-    state.bikes = state.bikes.filter((b) => b !== bike);
-    delete state.tracksByBike[bike];
-    delete state.bikeConfigs[bike];
-
-    Object.keys(state.setups).forEach((key) => {
-      if (key.startsWith(`${bike}__`)) delete state.setups[key];
-    });
-
-    state.selectedBike = state.bikes[0] || "";
-    state.selectedTrack = "";
-    state.selectedCondition = "";
-
-    if (state.selectedBike) ensureBikeExists(state.selectedBike);
-
-    saveState();
-    renderAll();
-  });
-
-  document.getElementById("addTrackBtn").addEventListener("click", () => {
-    if (!state.selectedBike) return;
-
-    const input = document.getElementById("trackInput");
-    const value = input.value.trim();
-    if (!value) return;
-
-    ensureBikeExists(state.selectedBike);
-
-    if (!state.tracksByBike[state.selectedBike].includes(value)) {
-      state.tracksByBike[state.selectedBike].push(value);
+  if (candidate && typeof candidate === "object") {
+    if (typeof candidate.selectedBike === "string") {
+      fresh.selectedBike = candidate.selectedBike;
+    }
+    if (typeof candidate.selectedTrack === "string") {
+      fresh.selectedTrack = candidate.selectedTrack;
+    }
+    if (typeof candidate.selectedCondition === "string") {
+      fresh.selectedCondition = candidate.selectedCondition;
     }
 
-    state.selectedTrack = value;
-    if (!state.selectedCondition) state.selectedCondition = "trocken";
-    ensureCurrentSetupExists();
+    if (candidate.data?.bikes && typeof candidate.data.bikes === "object") {
+      fresh.data.bikes = clone(candidate.data.bikes);
+    } else if (candidate.bikes && typeof candidate.bikes === "object") {
+      fresh.data.bikes = clone(candidate.bikes);
+    }
+  }
 
-    input.value = "";
-    saveState();
-    renderAll();
-  });
+  normalizeBikeData(fresh.data.bikes);
+  return fresh;
+}
 
-  document.querySelectorAll(".condition-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      state.selectedCondition = btn.dataset.condition;
-      ensureCurrentSetupExists();
-      saveState();
-      renderAll();
-    });
-  });
-
-  document.getElementById("saveSetupBtn").addEventListener("click", () => {
-    if (!state.selectedBike || !state.selectedTrack || !state.selectedCondition) {
-      alert("Bitte zuerst Bike, Strecke und Bedingung auswählen.");
+function normalizeBikeData(bikesObject) {
+  Object.keys(bikesObject).forEach((bikeName) => {
+    const bike = bikesObject[bikeName];
+    if (!bike || typeof bike !== "object") {
+      bikesObject[bikeName] = { tracks: {} };
       return;
     }
-    state.setups[currentSetupKey()] = collectSetupFromInputs();
-    saveState();
-    renderAll();
-  });
 
-  document.getElementById("resetSetupBtn").addEventListener("click", () => {
-    if (!state.selectedBike || !state.selectedTrack || !state.selectedCondition) {
-      alert("Bitte zuerst Bike, Strecke und Bedingung auswählen.");
-      return;
+    if (!bike.tracks || typeof bike.tracks !== "object") {
+      bike.tracks = {};
     }
-    state.setups[currentSetupKey()] = deepCopy(DEFAULT_SETUP);
-    saveState();
-    renderAll();
+
+    Object.keys(bike.tracks).forEach((trackName) => {
+      const track = bike.tracks[trackName];
+      if (!track || typeof track !== "object") {
+        bike.tracks[trackName] = { conditions: {} };
+        return;
+      }
+
+      if (!track.conditions || typeof track.conditions !== "object") {
+        track.conditions = {};
+      }
+
+      Object.keys(track.conditions).forEach((condition) => {
+        track.conditions[condition] = normalizeSetup(track.conditions[condition]);
+      });
+    });
   });
+}
 
-  document.getElementById("separateHighLow").addEventListener("change", (e) => {
-    updateBikeConfig("shockSeparate", e.target.checked);
-    renderSetup();
-    renderSummary();
+function normalizeSetup(setup) {
+  const clean = clone(DEFAULT_SETUP);
+
+  if (!setup || typeof setup !== "object") {
+    return clean;
+  }
+
+  clean.forkPressure = validNumber(setup.forkPressure, clean.forkPressure);
+  clean.forkPressureMax = validNumber(setup.forkPressureMax, clean.forkPressureMax);
+
+  clean.forkRebound = validNumber(setup.forkRebound, clean.forkRebound);
+  clean.forkReboundMax = validNumber(setup.forkReboundMax, clean.forkReboundMax);
+
+  clean.separateHighLow = Boolean(setup.separateHighLow);
+
+  clean.shockPressure = validNumber(setup.shockPressure, clean.shockPressure);
+  clean.shockPressureMax = validNumber(setup.shockPressureMax, clean.shockPressureMax);
+
+  clean.shockHigh = String(setup.shockHigh ?? clean.shockHigh);
+
+  clean.shockLow = validNumber(setup.shockLow, clean.shockLow);
+  clean.shockLowMax = validNumber(setup.shockLowMax, clean.shockLowMax);
+
+  clean.shockRebound = validNumber(setup.shockRebound, clean.shockRebound);
+  clean.shockReboundMax = validNumber(setup.shockReboundMax, clean.shockReboundMax);
+
+  clean.forkHeight = validNumber(setup.forkHeight, clean.forkHeight);
+  clean.notes = typeof setup.notes === "string" ? setup.notes : clean.notes;
+
+  return clean;
+}
+
+function validNumber(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    const loaded = normalizeImportedState(parsed);
+
+    state.selectedBike = loaded.selectedBike;
+    state.selectedTrack = loaded.selectedTrack;
+    state.selectedCondition = loaded.selectedCondition;
+    state.data = loaded.data;
+
+    normalizeSelections();
+  } catch (error) {
+    console.error("Fehler beim Laden:", error);
+  }
+}
+
+function persistState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function normalizeSelections() {
+  const bikeNames = getBikeNames();
+
+  if (!bikeNames.includes(state.selectedBike)) {
+    state.selectedBike = "";
+  }
+
+  if (!state.selectedBike) {
+    state.selectedTrack = "";
+    return;
+  }
+
+  const trackNames = getTrackNames(state.selectedBike);
+  if (!trackNames.includes(state.selectedTrack)) {
+    state.selectedTrack = "";
+  }
+
+  const validConditions = ["trocken", "nass", "feucht"];
+  if (!validConditions.includes(state.selectedCondition)) {
+    state.selectedCondition = "";
+  }
+}
+
+function ensureBike(bikeName) {
+  if (!state.data.bikes[bikeName]) {
+    state.data.bikes[bikeName] = { tracks: {} };
+  }
+}
+
+function ensureTrack(bikeName, trackName) {
+  ensureBike(bikeName);
+
+  if (!state.data.bikes[bikeName].tracks[trackName]) {
+    state.data.bikes[bikeName].tracks[trackName] = { conditions: {} };
+  }
+}
+
+function getBikeNames() {
+  return Object.keys(state.data.bikes);
+}
+
+function getTrackNames(bikeName) {
+  if (!bikeName || !state.data.bikes[bikeName]) return [];
+  return Object.keys(state.data.bikes[bikeName].tracks);
+}
+
+function isContextReady() {
+  return Boolean(state.selectedBike && state.selectedTrack && state.selectedCondition);
+}
+
+function getCurrentSetup() {
+  if (!isContextReady()) return null;
+
+  return state.data.bikes[state.selectedBike]?.tracks[state.selectedTrack]?.conditions?.[state.selectedCondition] || null;
+}
+
+function readForm() {
+  return normalizeSetup({
+    forkPressure: sliderControllers.forkPressure.getValue(),
+    forkPressureMax: sliderControllers.forkPressure.getMax(),
+
+    forkRebound: sliderControllers.forkRebound.getValue(),
+    forkReboundMax: sliderControllers.forkRebound.getMax(),
+
+    separateHighLow: el.separateHighLow.checked,
+
+    shockPressure: sliderControllers.shockPressure.getValue(),
+    shockPressureMax: sliderControllers.shockPressure.getMax(),
+
+    shockHigh: el.shockHighSelect.value,
+
+    shockLow: sliderControllers.shockLow.getValue(),
+    shockLowMax: sliderControllers.shockLow.getMax(),
+
+    shockRebound: sliderControllers.shockRebound.getValue(),
+    shockReboundMax: sliderControllers.shockRebound.getMax(),
+
+    forkHeight: validNumber(el.forkHeightInput.value, 0),
+    notes: el.notesInput.value.trim()
   });
+}
 
-  document.getElementById("shockHighSelect").addEventListener("change", (e) => {
-    updateSetupField("shockHigh", e.target.value);
-    setText("shockHighValue", e.target.value);
-    renderSummary();
-  });
+function setForm(setup) {
+  const data = normalizeSetup(setup);
 
-  document.getElementById("forkHeightInput").addEventListener("input", (e) => {
-    updateSetupField("forkHeight", clamp(e.target.value, 0, 30));
-  });
+  sliderControllers.forkPressure.set(data.forkPressure, data.forkPressureMax);
+  sliderControllers.forkRebound.set(data.forkRebound, data.forkReboundMax);
 
-  document.getElementById("notesInput").addEventListener("input", (e) => {
-    updateSetupField("notes", e.target.value);
-  });
+  sliderControllers.shockPressure.set(data.shockPressure, data.shockPressureMax);
+  sliderControllers.shockLow.set(data.shockLow, data.shockLowMax);
+  sliderControllers.shockRebound.set(data.shockRebound, data.shockReboundMax);
 
-  document.getElementById("exportBtn").addEventListener("click", exportJson);
-  document.getElementById("importBtn").addEventListener("click", () => {
-    document.getElementById("fileInput").click();
-  });
-  document.getElementById("fileInput").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) importJson(file);
-  });
+  el.separateHighLow.checked = data.separateHighLow;
+  el.shockHighSelect.value = data.shockHigh;
+  el.shockHighValue.textContent = data.shockHigh;
 
-  bindSlider(
-    "forkPressureRange",
-    "forkPressureNumber",
-    "forkPressureValue",
-    "forkPressureBadge",
-    "forkPressureMax",
-    "forkPressureMaxLabel",
-    "forkPressure",
-    "forkPressureMax"
-  );
+  el.forkHeightInput.value = String(data.forkHeight);
+  el.notesInput.value = data.notes;
 
-  bindSlider(
-    "forkReboundRange",
-    "forkReboundNumber",
-    "forkReboundValue",
-    "forkReboundBadge",
-    "forkReboundMax",
-    "forkReboundMaxLabel",
-    "forkRebound",
-    "forkReboundMax"
-  );
+  updateShockModeUI();
+  updateOverviews();
+}
 
-  bindSlider(
-    "shockPressureRange",
-    "shockPressureNumber",
-    "shockPressureValue",
-    "shockPressureBadge",
-    "shockPressureMax",
-    "shockPressureMaxLabel",
-    "shockPressure",
-    "shockPressureMax"
-  );
+function loadSetupIntoForm() {
+  const saved = getCurrentSetup();
+  if (saved) {
+    setForm(saved);
+  } else {
+    setForm(clone(DEFAULT_SETUP));
+  }
+}
 
-  bindSlider(
-    "shockLowRange",
-    "shockLowNumber",
-    "shockLowValue",
-    "shockLowBadge",
-    "shockLowMax",
-    "shockLowMaxLabel",
-    "shockLow",
-    "shockLowMax"
-  );
+function updateShockModeUI() {
+  const separate = el.separateHighLow.checked;
+  el.shockSimpleBlock.classList.toggle("hidden", separate);
+  el.shockSeparateBlock.classList.toggle("hidden", !separate);
+}
 
-  bindSlider(
-    "shockReboundRange",
-    "shockReboundNumber",
-    "shockReboundValue",
-    "shockReboundBadge",
-    "shockReboundMax",
-    "shockReboundMaxLabel",
-    "shockRebound",
-    "shockReboundMax"
-  );
+function updateOverviews() {
+  el.forkOverview.textContent =
+    `Druckstufe ${sliderControllers.forkPressure.getValue()} · Zugstufe ${sliderControllers.forkRebound.getValue()}`;
 
-  bindAccordion();
-  bindMaxToggles();
+  if (el.separateHighLow.checked) {
+    el.shockOverview.textContent =
+      `High ${el.shockHighSelect.value} · Low ${sliderControllers.shockLow.getValue()} · Zug ${sliderControllers.shockRebound.getValue()}`;
+  } else {
+    el.shockOverview.textContent =
+      `Druckstufe ${sliderControllers.shockPressure.getValue()} · Zugstufe ${sliderControllers.shockRebound.getValue()}`;
+  }
 }
 
 function renderAll() {
-  renderBikeCards();
+  applyBrandTheme(state.selectedBike);
+  renderBikes();
   renderTracks();
   renderConditions();
-  renderSetup();
-  renderSummary();
-  saveState();
+  renderContextInfo();
+  renderActionStates();
+  updateAccordionArrows();
 }
 
-function runSanityChecks() {
-  console.assert(clamp(30, 0, 22) === 22, "Clamp oben fehlerhaft");
-  console.assert(clamp(-5, 0, 22) === 0, "Clamp unten fehlerhaft");
-  console.assert(DEFAULT_BIKE_CONFIG.forkPressureMax === 22, "Default Bike Config fehlerhaft");
+function renderBikes() {
+  const bikeNames = getBikeNames();
+
+  if (bikeNames.length === 0) {
+    el.bikeList.innerHTML = `<div class="empty-state">Noch keine Bikes angelegt.</div>`;
+    return;
+  }
+
+  el.bikeList.innerHTML = "";
+
+  bikeNames.forEach((bikeName) => {
+    const theme = getBrandTheme(bikeName);
+    const card = document.createElement("button");
+
+    card.type = "button";
+    card.className = `bike-card${state.selectedBike === bikeName ? " active" : ""}`;
+    card.style.setProperty("--card-accent", theme.accent);
+    card.style.setProperty("--card-soft", theme.soft);
+    card.style.setProperty("--card-border", theme.border);
+    card.style.setProperty("--card-text", theme.text);
+
+    const trackCount = getTrackNames(bikeName).length;
+
+    card.innerHTML = `
+      <div class="bike-card-top">
+        <div class="bike-icon">🏍</div>
+        ${state.selectedBike === bikeName ? '<div class="active-badge">Aktiv</div>' : ""}
+      </div>
+      <div class="bike-name">${escapeHtml(bikeName)}</div>
+      <div class="bike-sub">${trackCount} Strecke${trackCount === 1 ? "" : "n"}</div>
+      <div class="bike-brand">${escapeHtml(theme.name)}</div>
+    `;
+
+    card.addEventListener("click", () => {
+      state.selectedBike = bikeName;
+
+      const trackNames = getTrackNames(bikeName);
+      if (!trackNames.includes(state.selectedTrack)) {
+        state.selectedTrack = "";
+      }
+
+      persistState();
+      renderAll();
+      loadSetupIntoForm();
+    });
+
+    el.bikeList.appendChild(card);
+  });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  runSanityChecks();
-  loadState();
-  bindEvents();
-  renderAll();
-});
+function renderTracks() {
+  if (!state.selectedBike) {
+    el.trackList.innerHTML = `<div class="empty-state">Bitte zuerst ein Bike auswählen.</div>`;
+    return;
+  }
+
+  const trackNames = getTrackNames(state.selectedBike);
+
+  if (trackNames.length === 0) {
+    el.trackList.innerHTML = `<div class="empty-state">Noch keine Strecken für dieses Bike angelegt.</div>`;
+    return;
+  }
+
+  el.trackList.innerHTML = "";
+
+  trackNames.forEach((trackName) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `track-card${state.selectedTrack === trackName ? " active" : ""}`;
+    button.innerHTML = `
+      <div class="track-name">${escapeHtml(trackName)}</div>
+      <div class="track-sub">Bike: ${escapeHtml(state.selectedBike)}</div>
+    `;
+
+    button.addEventListener("click", () => {
+      state.selectedTrack = trackName;
+      persistState();
+      renderAll();
+      loadSetupIntoForm();
+    });
+
+    el.trackList.appendChild(button);
+  });
+}
+
+function renderConditions() {
+  document.querySelectorAll(".condition-btn").forEach((button) => {
+    const isActive = button.dataset.condition === state.selectedCondition;
+    button.classList.toggle("active", isActive);
+  });
+}
+
+function renderContextInfo() {
+  el.summaryBike.textContent = state.selectedBike || "–";
+  el.summaryTrack.textContent = state.selectedTrack || "–";
+  el.summaryCondition.textContent = state.selectedCondition || "–";
+
+  if (state.selectedBike) {
+    const theme = getBrandTheme(state.selectedBike);
+    el.heroPill.textContent = theme.name;
+  } else {
+    el.heroPill.textContent = "Kein Bike gewählt";
+  }
+
+  if (isContextReady()) {
+    const label = `${state.selectedBike} · ${state.selectedTrack} · ${capitalize(state.selectedCondition)}`;
+    el.setupContext.textContent = label;
+    el.sidebarStatus.textContent = label;
+  } else if (state.selectedBike && state.selectedTrack) {
+    el.setupContext.textContent = "Bitte Bedingung wählen";
+    el.sidebarStatus.textContent = `${state.selectedBike} · ${state.selectedTrack}`;
+  } else if (state.selectedBike) {
+    el.setupContext.textContent = "Bitte Strecke und Bedingung wählen";
+    el.sidebarStatus.textContent = state.selectedBike;
+  } else {
+    el.setupContext.textContent = "Bitte Bike, Strecke und Bedingung wählen";
+    el.sidebarStatus.textContent = "Kein Setup aktiv";
+  }
+}
+
+function renderActionStates() {
+  el.addTrackBtn.disabled = !state.selectedBike;
+  el.deleteBikeBtn.disabled = !state.selectedBike;
+  el.saveSetupBtn.disabled = !isContextReady();
+}
+
+function updateAccordionArrows() {
+  document.querySelectorAll(".accordion-toggle").forEach((button) => {
+    const target = document.getElementById(button.dataset.target);
+    const arrow = button.querySelector(".accordion-arrow");
+    if (!target || !arrow) return;
+
+    arrow.textContent = target.classList.contains("open-content") ? "▴" : "▾";
+  });
+}
+
+function capitalize(value) {
+  if (!value) return "–";
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
